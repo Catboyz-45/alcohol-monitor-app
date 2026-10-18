@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ต้องใช้ใน release build เพื่อเชื่อมต่อ NETPIE และ Firebase -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Alcohol Monitor"
         android:name="${applicationName}"

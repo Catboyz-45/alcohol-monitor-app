@@ -1,306 +1,419 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'app_state.dart';
+import 'device_reading.dart';
+import 'thai_id.dart';
+import 'theme.dart';
+import 'widgets/common.dart';
 
-class MeasurementHistoryPage extends StatelessWidget {
+class MeasurementHistoryPage extends StatefulWidget {
   const MeasurementHistoryPage({super.key});
 
   @override
-  // แสดงรายการประวัติทั้งหมดและปุ่มรีเฟรชข้อมูล
+  State<MeasurementHistoryPage> createState() => _MeasurementHistoryPageState();
+}
+
+class _MeasurementHistoryPageState extends State<MeasurementHistoryPage> {
+  String _query = '';
+  AlertStatus? _filter;
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, appState, child) {
-        final records = appState.records;
-        final total = records.length;
+    final appState = context.watch<AppState>();
+    final all = appState.records;
+    final query = _query.trim().toLowerCase();
+    final records =
+        all.where((r) {
+          if (_filter != null && r.alertStatus != _filter) {
+            return false;
+          }
+          if (query.isEmpty) {
+            return true;
+          }
+          return r.name.toLowerCase().contains(query) ||
+              r.licensePlate.toLowerCase().contains(query);
+        }).toList();
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    int count(AlertStatus status) =>
+        all.where((r) => r.alertStatus == status).length;
+
+    return RefreshIndicator(
+      onRefresh: appState.syncNow,
+      child: PageBody(
+        children: [
+          if (appState.hasCloud) ...[
+            _SyncBanner(appState: appState),
+            const SizedBox(height: 12),
+          ],
+          TextField(
+            decoration: const InputDecoration(
+              hintText: 'ค้นหาชื่อหรือทะเบียนรถ',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) => setState(() => _query = value),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'ประวัติการวัดค่า',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      // ดึงประวัติล่าสุดจาก cloud/local ใหม่อีกครั้ง
-                      await appState.loadRecords();
-                      if (!context.mounted) {
-                        return;
-                      }
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text('รีเฟรชประวัติแล้ว'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('รีเฟรชประวัติ'),
-                  ),
-                ],
+              ChoiceChip(
+                label: Text('ทั้งหมด ${all.length}'),
+                selected: _filter == null,
+                onSelected: (_) => setState(() => _filter = null),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'จำนวนทั้งหมด: $total รายการ',
-                style: const TextStyle(fontSize: 16, color: Colors.white70),
-              ),
-              const SizedBox(height: 20),
-              if (records.isEmpty)
-                Center(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 40),
-                      const Icon(
-                        Icons.history,
-                        size: 80,
-                        color: Colors.white24,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'ยังไม่มีประวัติการวัดค่า',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          color: Colors.white54,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'ไปที่แท็บวัดค่าเพื่อบันทึกข้อมูล',
-                        style: TextStyle(color: Colors.white38),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: records.length,
-                  itemBuilder: (context, index) {
-                    final record = records[index];
-
-                    Color statusColor;
-                    IconData iconData;
-                    String displayStatus = record.status;
-
-                    // แปลงสถานะที่อาจหลากหลายให้เหลือชุดเดียวเพื่อแสดงผล
-                    switch (record.status.toUpperCase()) {
-                      case 'SAFE':
-                      case 'SOBER':
-                        statusColor = Colors.greenAccent;
-                        iconData = Icons.check_circle;
-                        displayStatus = 'SAFE';
-                        break;
-                      case 'WARNING':
-                        statusColor = Colors.yellowAccent;
-                        iconData = Icons.error_outline;
-                        displayStatus = 'WARNING';
-                        break;
-                      case 'DRUNK':
-                        statusColor = Colors.redAccent;
-                        iconData = Icons.warning_rounded;
-                        displayStatus = 'DRUNK';
-                        break;
-                      default:
-                        statusColor = Colors.greenAccent;
-                        iconData = Icons.check_circle;
-                        displayStatus = 'SAFE';
-                    }
-
-                    return Card(
-                      color: Colors.black,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                iconData,
-                                color: statusColor,
-                                size: 30,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    record.name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'บัตรปชช: ${record.idCard} | อายุ: ${record.age} ปี',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'ทะเบียน: ${record.licensePlate} | ${record.province}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'ค่าที่วัดได้: ${record.alcoholValue.toStringAsFixed(1)} | สถานะ: $displayStatus',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: statusColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _formatDateTime(record.timestamp),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              children: [
-                                Text(
-                                  displayStatus,
-                                  style: TextStyle(
-                                    color: statusColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                  ),
-                                  // กดลบแล้วเปิด dialog ยืนยันก่อนทุกครั้ง
-                                  onPressed:
-                                      () => _confirmDelete(
-                                        context,
-                                        appState,
-                                        record,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        // แสดงกล่องยืนยันก่อนลบ และแจ้งผลลบสำเร็จ/ไม่สำเร็จ
-                      ),
-                    );
-                  },
+              for (final status in AlertStatus.values)
+                ChoiceChip(
+                  avatar: Icon(status.icon, size: 18, color: status.color),
+                  label: Text('${status.label} ${count(status)}'),
+                  selected: _filter == status,
+                  onSelected:
+                      (selected) =>
+                          setState(() => _filter = selected ? status : null),
                 ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          if (records.isEmpty)
+            _EmptyState(hasRecords: all.isNotEmpty)
+          else
+            for (final record in records) ...[
+              _RecordTile(record: record),
+              const SizedBox(height: 10),
+            ],
+        ],
+      ),
     );
   }
+}
 
-  void _confirmDelete(
-    BuildContext context,
-    AppState appState,
-    MeasurementRecord record,
-  ) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            title: const Text('ยืนยันการลบ'),
-            content: Text('ต้องการลบข้อมูลของ ${record.name} หรือไม่?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('ยกเลิก'),
+class _SyncBanner extends StatelessWidget {
+  const _SyncBanner({required this.appState});
+
+  final AppState appState;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = appState.pendingSyncCount;
+    final error = appState.syncError;
+    final theme = Theme.of(context);
+
+    final (IconData icon, Color color, String text) =
+        appState.syncing
+            ? (Icons.sync, theme.colorScheme.primary, 'กำลังซิงก์กับ cloud…')
+            : error != null
+            ? (
+              Icons.cloud_off_outlined,
+              AlertStatus.warning.color,
+              pending > 0
+                  ? 'ซิงก์ไม่สำเร็จ ค้างอยู่ $pending รายการ: $error'
+                  : 'ซิงก์ไม่สำเร็จ: $error',
+            )
+            : pending > 0
+            ? (
+              Icons.cloud_upload_outlined,
+              AlertStatus.warning.color,
+              'รอส่งขึ้น cloud $pending รายการ',
+            )
+            : (
+              Icons.cloud_done_outlined,
+              AlertStatus.safe.color,
+              'ซิงก์กับ cloud แล้ว',
+            );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: TextStyle(color: color))),
+          TextButton(
+            onPressed: appState.syncing ? null : appState.syncNow,
+            child: const Text('ซิงก์ตอนนี้'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.hasRecords});
+
+  final bool hasRecords;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        children: [
+          Icon(
+            hasRecords ? Icons.search_off : Icons.history,
+            size: 64,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            hasRecords ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีประวัติการตรวจ',
+            style: theme.textTheme.titleMedium,
+          ),
+          if (!hasRecords)
+            Text(
+              'บันทึกผลตรวจได้ที่แท็บตรวจวัด',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecordTile extends StatelessWidget {
+  const _RecordTile({required this.record});
+
+  final MeasurementRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = record.alertStatus;
+    final muted = TextStyle(color: theme.colorScheme.onSurfaceVariant);
+    final hasCloud = context.select<AppState, bool>((s) => s.hasCloud);
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showDetails(context, record),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: status.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  record.alcoholValue.toStringAsFixed(0),
+                  style: TextStyle(
+                    color: status.color,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-
-                  try {
-                    // ลบจาก state (และพยายามลบที่ cloud) ตาม id
-                    await appState.removeRecord(record.id);
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text('ลบข้อมูลสาเร็จ'),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(
-                            content: Text('เกิดข้อผิดพลาด: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                    }
-                  }
-                },
-                child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      record.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${record.licensePlate} · ${record.province}',
+                      style: muted,
+                    ),
+                    Text(formatThaiDateTime(record.timestamp), style: muted),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  StatusPill(status),
+                  if (hasCloud && !record.synced) ...[
+                    const SizedBox(height: 6),
+                    Tooltip(
+                      message: 'ยังไม่ได้ส่งขึ้น cloud',
+                      child: Icon(
+                        Icons.cloud_upload_outlined,
+                        size: 18,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
+        ),
+      ),
     );
   }
 
-  // ฟอร์แมตวันที่ภาษาไทยแบบอ่านเร็ว
-  String _formatDateTime(DateTime dateTime) {
-    const months = [
-      'ม.ค.',
-      'ก.พ.',
-      'มี.ค.',
-      'เม.ย.',
-      'พ.ค.',
-      'มิ.ย.',
-      'ก.ค.',
-      'ส.ค.',
-      'ก.ย.',
-      'ต.ค.',
-      'พ.ย.',
-      'ธ.ค.',
-    ];
+  // รายละเอียดเต็ม: เลขบัตรปิดไว้ก่อน กดเพื่อแสดง
+  void _showDetails(BuildContext context, MeasurementRecord record) {
+    final appState = context.read<AppState>();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder:
+          (sheetContext) => _RecordDetails(
+            record: record,
+            hasCloud: appState.hasCloud,
+            onDelete: () async {
+              final confirmed = await showDialog<bool>(
+                context: sheetContext,
+                builder:
+                    (dialogContext) => AlertDialog(
+                      title: const Text('ลบรายการนี้?'),
+                      content: Text(
+                        appState.hasCloud
+                            ? 'ข้อมูลของ ${record.name} จะถูกลบจากเครื่องนี้และ cloud'
+                            : 'ข้อมูลของ ${record.name} จะถูกลบจากเครื่องนี้',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed:
+                              () => Navigator.of(dialogContext).pop(false),
+                          child: const Text('ยกเลิก'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AlertStatus.danger.color,
+                            minimumSize: const Size(0, 40),
+                          ),
+                          onPressed:
+                              () => Navigator.of(dialogContext).pop(true),
+                          child: const Text('ลบ'),
+                        ),
+                      ],
+                    ),
+              );
+              if (confirmed != true || !sheetContext.mounted) {
+                return;
+              }
+              Navigator.of(sheetContext).pop();
+              await appState.removeRecord(record.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('ลบข้อมูลสำเร็จ')),
+                  );
+              }
+            },
+          ),
+    );
+  }
+}
 
-    return '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year} '
-        'เวลา ${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
+class _RecordDetails extends StatefulWidget {
+  const _RecordDetails({
+    required this.record,
+    required this.hasCloud,
+    required this.onDelete,
+  });
+
+  final MeasurementRecord record;
+  final bool hasCloud;
+  final VoidCallback onDelete;
+
+  @override
+  State<_RecordDetails> createState() => _RecordDetailsState();
+}
+
+class _RecordDetailsState extends State<_RecordDetails> {
+  bool _showId = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    final theme = Theme.of(context);
+
+    Widget row(String label, String value, {Widget? trailing}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyLarge)),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    record.name,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                StatusPill(record.alertStatus, large: true),
+              ],
+            ),
+            const SizedBox(height: 12),
+            row('ค่าที่วัดได้', record.alcoholValue.toStringAsFixed(1)),
+            row(
+              'เลขบัตรประชาชน',
+              _showId ? formatThaiId(record.idCard) : maskThaiId(record.idCard),
+              trailing: IconButton(
+                tooltip: _showId ? 'ซ่อนเลขบัตร' : 'แสดงเลขบัตร',
+                icon: Icon(
+                  _showId
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+                onPressed: () => setState(() => _showId = !_showId),
+              ),
+            ),
+            row('อายุ', '${record.age} ปี'),
+            row('ทะเบียนรถ', '${record.licensePlate} ${record.province}'),
+            row('เวลา', formatThaiDateTime(record.timestamp)),
+            row(
+              'สถานะข้อมูล',
+              !widget.hasCloud
+                  ? 'เก็บในเครื่องนี้เท่านั้น'
+                  : record.synced
+                  ? 'ซิงก์กับ cloud แล้ว'
+                  : 'รอส่งขึ้น cloud',
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: widget.onDelete,
+              icon: Icon(Icons.delete_outline, color: AlertStatus.danger.color),
+              label: Text(
+                'ลบรายการ',
+                style: TextStyle(color: AlertStatus.danger.color),
+              ),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

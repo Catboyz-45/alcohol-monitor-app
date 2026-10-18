@@ -7,5 +7,13 @@ import 'mqtt_client_factory_io.dart'
 MqttClient createMqttClient({
   required String clientId,
   required String host,
+  required int port,
+  required bool useTls,
   required String wsUrl,
-}) => createPlatformMqttClient(clientId: clientId, host: host, wsUrl: wsUrl);
+}) => createPlatformMqttClient(
+  clientId: clientId,
+  host: host,
+  port: port,
+  useTls: useTls,
+  wsUrl: wsUrl,
+);
