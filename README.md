@@ -1,146 +1,175 @@
 # Alcohol Monitor
 
-แอปพลิเคชันติดตามและบันทึกผลการตรวจแอลกอฮอล์จากอุปกรณ์ IoT พัฒนาด้วย Flutter เชื่อมต่อบอร์ดและเซนเซอร์ผ่าน NETPIE โดยรองรับข้อมูลแบบ real-time ผ่าน MQTT การควบคุมอุปกรณ์ และการเก็บประวัติทั้งในเครื่องและ Cloud Firestore
+แอป Flutter สำหรับเจ้าหน้าที่ใช้บันทึกผลตรวจแอลกอฮอล์จากเครื่องวัด IoT (ESP32 + เซนเซอร์ MQ-3) รับค่าแบบเรียลไทม์ผ่าน NETPIE จำค่าสูงสุดของการเป่าแต่ละครั้ง และเก็บประวัติลง Cloud Firestore โดยต้องเข้าสู่ระบบก่อน ถ้าเน็ตหลุด แอปเก็บข้อมูลไว้ในเครื่องแล้วส่งขึ้น cloud ให้ภายหลัง
 
-โปรเจกต์นี้เป็นผลงานระหว่างเรียน รายวิชา 02739342 Application Development for Mobile Devices
+ผลงานรายวิชา 02739342 Application Development for Mobile Devices · โค้ดฝั่งบอร์ดอยู่ที่ [alcohol-monitor-firmware](https://github.com/Catboyz-45/alcohol-monitor-firmware)
 
-## เกี่ยวกับโปรเจกต์
+**ลองใช้ได้ทันที:** [เว็บเดโม](https://catboyz-45.github.io/alcohol-monitor-app/)
 
-Alcohol Monitor ช่วยให้ผู้ใช้งานรับค่าจากเซนเซอร์ตรวจวัดแอลกอฮอล์ บันทึกข้อมูลผู้เข้ารับการตรวจและข้อมูลรถ ตรวจสอบประวัติย้อนหลัง รวมถึงตั้งค่าเกณฑ์แจ้งเตือนและควบคุม Buzzer หรือไฟ LED จากแอปเดียว
+| วิธีเข้า | ใช้ทำอะไร |
+| --- | --- |
+| อีเมล `demo@alcohol-monitor.test` รหัส `12345678` | ล็อกอินจริงด้วย Firebase Auth บันทึกและซิงก์ประวัติกับ Cloud Firestore |
+| ปุ่ม **"ทดลองใช้โหมดสาธิต"** | ไม่ต้องมีบัญชี เก็บข้อมูลไว้ในเบราว์เซอร์อย่างเดียว |
 
-โปรเจกต์นี้แสดงการประยุกต์ใช้ Flutter ร่วมกับ Provider, MQTT, NETPIE REST API, SharedPreferences และ Cloud Firestore REST API รวมถึงการรองรับการเชื่อมต่อ MQTT ที่ต่างกันระหว่างแอป native และเว็บ
+ทั้งสองแบบใช้อุปกรณ์จำลอง (กด "จำลองการเป่า" ได้) ข้อมูลทั้งหมดในระบบเดโมเป็นข้อมูลสมมติ และบัญชีทดลองใช้ร่วมกันทุกคน **อย่ากรอกชื่อหรือเลขบัตรของคนจริง**
 
-โค้ดฝั่งอุปกรณ์ IoT แยกไว้ใน repository `alcohol-monitor-firmware`
+| เข้าสู่ระบบ | ตรวจวัด | ประวัติ | รายละเอียด | อุปกรณ์ |
+| --- | --- | --- | --- | --- |
+| ![เข้าสู่ระบบ](docs/screenshots/login.png) | ![ตรวจวัด](docs/screenshots/measure.png) | ![ประวัติ](docs/screenshots/history.png) | ![รายละเอียด](docs/screenshots/record-detail.png) | ![อุปกรณ์](docs/screenshots/device.png) |
 
 ## ความสามารถหลัก
 
-- รับค่าการตรวจแอลกอฮอล์จากอุปกรณ์แบบ real-time ผ่าน MQTT
-- ดึงสถานะล่าสุดจาก NETPIE Device Shadow ผ่าน HTTP เป็นระบบสำรอง
-- แสดงค่า BAC, ค่าดิบจากเซนเซอร์ และระดับแจ้งเตือน
-- แบ่งสถานะผลตรวจเป็น `SAFE`, `WARNING` และ `DRUNK`
-- บันทึกชื่อ เลขบัตรประชาชน อายุ ทะเบียนรถ จังหวัด และผลตรวจ
-- แสดงประวัติการตรวจย้อนหลังและสรุปจำนวนรายการ
-- เก็บประวัติในเครื่องด้วย SharedPreferences
-- ซิงก์ประวัติกับ Cloud Firestore เมื่อกำหนดค่า Firebase
-- ตั้งค่า Threshold สองระดับและส่งค่าไปยังอุปกรณ์
-- สั่งเปิดหรือปิด Buzzer และไฟ LED สีแดง
-- รองรับ Android, iOS, macOS, Linux, Windows และ Web ตามแพลตฟอร์มที่ Flutter รองรับ
-- แยกค่าการเชื่อมต่อและ credentials ออกจาก source code ด้วย `--dart-define-from-file`
+- **ค่าสดจากบอร์ด** ผ่าน NETPIE MQTT (TLS) ใช้ credential ของแอปเองชุดเดียว ไม่ต้องฝัง token ของบอร์ดไว้ในแอป
+- **จำค่าสูงสุดของการเป่า** บอร์ดค้างค่าบนจอแค่ 2.5 วินาที แอปจึงจำค่าสูงสุดไว้ให้บันทึกได้ทัน
+- **รู้ว่าบอร์ดออฟไลน์** แยกสถานะ "ออนไลน์ / ไม่ส่งข้อมูล / เชื่อมต่อไม่ได้" ไม่ใช่แค่ดูว่า API ตอบหรือไม่
+- **ตั้งเกณฑ์แจ้งเตือนจากแอป** และรอให้บอร์ดยืนยันว่ารับค่าแล้ว
+- **บันทึกแบบ offline-first** ถ้าส่งขึ้น cloud ไม่สำเร็จ รายการจะเข้าคิวและส่งใหม่อัตโนมัติ (ลบก็เช่นกัน)
+- **ปกป้องข้อมูลส่วนบุคคล** ต้องล็อกอินด้วย Firebase Auth และ Firestore Security Rules ให้เฉพาะเจ้าหน้าที่ที่ได้รับสิทธิ์ ส่วนเลขบัตรประชาชนจะถูกปิดไว้ในหน้าประวัติ
+- **ตรวจเลขบัตรประชาชนด้วย checksum** และเลือกจังหวัดได้ครบ 77 จังหวัด
+- **โหมดสาธิต** ใช้อุปกรณ์จำลอง มีปุ่ม "จำลองการเป่า" ลองครบทุกขั้นตอนได้โดยไม่ต้องมีฮาร์ดแวร์
+- รองรับ Android, iOS, macOS และ Web ทั้งธีมสว่างและธีมมืด
 
-## เทคโนโลยีที่ใช้
+## สถาปัตยกรรม
 
-| หมวด | เทคโนโลยี |
-| --- | --- |
-| Application | Flutter, Dart |
-| UI | Material Design 3, Google Fonts |
-| State management | Provider |
-| IoT messaging | MQTT, NETPIE |
-| Device API | NETPIE REST API และ Device Shadow |
-| Cloud storage | Cloud Firestore REST API |
-| Local storage | SharedPreferences |
-| Networking | `http`, `mqtt_client` |
-
-## โครงสร้างโปรเจกต์
-
-```text
-lib/
-├── main.dart                     # จุดเริ่มต้นแอปและ Provider กลาง
-├── app_state.dart                # State, โมเดล และการจัดเก็บประวัติ
-├── home_page.dart                # Navigation และประสาน MQTT/HTTP
-├── home_service.dart             # เรียก NETPIE REST API
-├── mqtt_service.dart             # เชื่อมต่อและอ่าน MQTT payload
-├── mqtt_client_factory.dart      # เลือก MQTT client ตามแพลตฟอร์ม
-├── mqtt_client_factory_io.dart   # MQTT ผ่าน TCP สำหรับ native
-├── mqtt_client_factory_web.dart  # MQTT ผ่าน WebSocket สำหรับเว็บ
-├── measurement_form_page.dart    # แบบฟอร์มบันทึกผลตรวจ
-├── measurement_history_page.dart # ประวัติและการลบรายการ
-└── settings_page.dart            # Threshold, Buzzer และ LED
+```mermaid
+flowchart LR
+  subgraph Board[ESP32 + MQ-3]
+    FW[firmware]
+  end
+  subgraph NETPIE[NETPIE MQTT broker]
+    MSG["@msg/home/device_status"]
+    CTRL["@msg/home/device_control"]
+  end
+  subgraph App[Flutter app]
+    MQ[MqttService]
+    ST[AppState]
+    FS[FirestoreRepository]
+  end
+  FW -- "ผลวัด + heartbeat ทุก 5 วิ" --> MSG --> MQ --> ST
+  MQ -- "threshold / ping" --> CTRL --> FW
+  ST <--> FS <--> FB[(Cloud Firestore)]
 ```
 
-## การติดตั้งและรัน
+### ข้อตกลงข้อมูลระหว่างแอปกับบอร์ด
 
-### สิ่งที่ต้องมี
+| Topic (MQTT) | ทิศทาง | Payload |
+| --- | --- | --- |
+| `@msg/home/device_status` | บอร์ด → แอป | `{bac, raw, threshold1, threshold2, alertLevel, millis}` ส่งเมื่อมีการเป่า, heartbeat ทุก 5 วินาที และตอบ ping |
+| `@msg/home/device_control` | แอป → บอร์ด | `{threshold1, threshold2}` ตั้งเกณฑ์ หรือ `{ping: 1}` ขอสถานะทันที |
 
-- Flutter SDK ที่รองรับ Dart `^3.7.2`
-- Android Studio หรือ Xcode ตามแพลตฟอร์มที่ต้องการรัน
-- NETPIE project พร้อม device credentials สำหรับ MQTT และ REST API
-- Firebase project และ Cloud Firestore หากต้องการซิงก์ข้อมูลขึ้น Cloud
+- `bac` คือค่าสเกล 0–100 ที่แปลงเชิงเส้นมาจาก ADC (0–4095) **ยังไม่ใช่ค่า BAC ตามกฎหมาย**
+- `alertLevel` คือ 0 (ปลอดภัย), 1 (เฝ้าระวัง, ≥ threshold1), 2 (เกินเกณฑ์, ≥ threshold2) ใช้กติกาเดียวกันทั้งสองฝั่ง ถ้า payload ไม่มี field นี้ แอปจะคำนวณเอง
+- แอปถือว่าบอร์ดเงียบไปเมื่อไม่มีข้อความเกิน 12 วินาที (heartbeat หลุดได้ 1 รอบ) และถ้า MQTT หลุดจะแสดงว่าไม่ได้เชื่อมต่อทันที
+- แอปและบอร์ดเป็นคนละ device ใน NETPIE แต่ต้องอยู่ **group เดียวกัน** ถึงจะส่ง `@msg` ถึงกันได้
 
-### ขั้นตอน
+> ต้องใช้ firmware รุ่นที่มี heartbeat และตอบ ping (ตั้งแต่ [alcohol-monitor-firmware#1](https://github.com/Catboyz-45/alcohol-monitor-firmware/pull/1)) ถ้าใช้ firmware รุ่นเก่า แอปจะได้ข้อมูลเฉพาะตอนมีการเป่า และจะขึ้นว่าบอร์ดเงียบในช่วงที่ไม่มีการเป่า
+
+ตัวแปลง payload อยู่ที่ [`lib/device_reading.dart`](lib/device_reading.dart) และมีเทสต์ครอบทุกรูปแบบที่ firmware ส่ง
+
+## เริ่มต้นใช้งาน
+
+ต้องมี Flutter SDK (Dart ≥ 3.7)
 
 ```bash
 git clone https://github.com/Catboyz-45/alcohol-monitor-app.git
 cd alcohol-monitor-app
 flutter pub get
-cp config.example.json config.json
+flutter run -d chrome   # ไม่ต้องตั้งค่าอะไร จะเปิดเป็นโหมดสาธิต
 ```
 
-แก้ไข `config.json` ให้เป็นค่าของ NETPIE และ Firebase ของตนเอง ห้าม commit ไฟล์นี้ขึ้น repository จากนั้นรัน:
+### ต่อกับบอร์ดจริงและ Firebase
 
 ```bash
+cp config.example.json config.json   # config.json อยู่ใน .gitignore แล้ว
 flutter run --dart-define-from-file=config.json
 ```
 
-ถ้าไม่กำหนดค่า Firebase แอปยังเก็บประวัติไว้ในเครื่องได้ หากไม่กำหนด NETPIE credentials แอปเปิดดู UI ได้ แต่จะไม่สามารถอ่านสถานะหรือควบคุมอุปกรณ์จริง
+| ค่า | ใช้ทำอะไร |
+| --- | --- |
+| `APP_MQTT_CLIENT_ID` / `APP_MQTT_USER` / `APP_MQTT_PASSWORD` | Client ID / Token / Secret ของ **device ฝั่งแอป** ใน NETPIE (สร้างแยกจากบอร์ด แต่อยู่ group เดียวกัน) |
+| `APP_MQTT_PORT` / `APP_MQTT_TLS` | ค่าเริ่มต้นคือ `8883` และ TLS เปิดอยู่ (ใช้กับแอป native ส่วนเว็บใช้ `APP_MQTT_WS_URL`) อย่าใช้ `1884` เพราะใบรับรองออกโดย CA ส่วนตัวของ NEXPIE แอปจึงตรวจไม่ผ่าน |
+| `APP_FIREBASE_PROJECT_ID` / `APP_FIREBASE_API_KEY` | เปิดการล็อกอินและซิงก์กับ Firestore (ไม่ใส่ = เก็บประวัติในเครื่องอย่างเดียว) |
 
-### การ Build
+### ตั้งค่า Firebase
+
+1. เปิด **Authentication → Email/Password** และสร้างบัญชีเจ้าหน้าที่ใน Firebase Console
+2. ถ้าไม่ต้องการให้คนอื่นสมัครเองได้ ให้ปิด **Authentication → Settings → User actions → Enable create (sign-up)**
+3. สร้างเอกสาร `officers/{uid}` ใน Firestore ให้แต่ละบัญชีที่อนุญาต (จะใส่ field อะไรก็ได้ เช่น `{ "name": "..." }`)
+4. Deploy Security Rules ใน [`firestore.rules`](firestore.rules):
 
 ```bash
-flutter build apk --release --dart-define-from-file=config.json
+firebase deploy --only firestore:rules --project <your-project-id>
 ```
 
-สำหรับเว็บ:
+### บัญชีทดลอง
 
-```bash
-flutter build web --release --dart-define-from-file=config.json
-```
+บัญชี `demo@alcohol-monitor.test` (รหัส `12345678`) สร้างไว้ใน Firebase ของเดโมแล้ว และมีเอกสาร `officers/{uid}` ที่มี `role: "demo"` ถ้าจะใช้กับ Firebase project ของตัวเอง ให้สร้างบัญชีตามขั้นตอนด้านบน แล้วเพิ่ม `officers/{uid}` ให้บัญชีนั้น
 
-> ค่าที่ส่งด้วย `dart-define` จะถูกฝังใน client application ตอน build จึงไม่ถือเป็น secret storage ที่ปลอดภัย สำหรับ production ควรให้แอปเรียก trusted backend ที่ตรวจสอบสิทธิ์แทนการแจก device token ให้ client โดยตรง
-
-## การตรวจสอบคุณภาพโค้ด
+## การทดสอบ
 
 ```bash
 flutter analyze
 flutter test
-flutter build apk --release
 ```
 
-สถานะการตรวจล่าสุด:
+ทดสอบ Firestore Security Rules (ต้องมี Node 22 และ Java 21):
 
-- `flutter analyze` — ผ่าน ไม่พบปัญหา
-- `flutter test` — ผ่าน 1 test
-- `flutter build apk --release` — ผ่าน
+```bash
+cd firestore-tests && npm ci && npm test
+```
 
-## สิ่งที่ได้เรียนรู้
+ทุก PR รัน format check, analyze, test และ build web ผ่าน GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) เทสต์ครอบคลุม:
 
-- ออกแบบแอป Flutter แบบหลายหน้าจอด้วย Material Design 3
-- จัดการ state กลางและข้อมูลแบบ reactive ด้วย Provider
-- รับข้อมูล IoT แบบ real-time ด้วย MQTT
-- ใช้ HTTP polling เป็น fallback เมื่อ MQTT ขาดช่วง
-- แยก implementation ของ MQTT สำหรับ native และเว็บ
-- เก็บข้อมูลแบบ offline-first และซิงก์กับ Cloud
-- ควบคุมอุปกรณ์และปรับ Threshold ผ่าน NETPIE
-- แยกค่าคอนฟิกออกจาก source code
+- การแปลง payload ทุกรูปแบบที่ firmware ส่ง (ผลวัด, heartbeat, ค่าที่เป็น string, JSON ที่เสีย)
+- คิวซิงก์ offline: บันทึกหรือลบตอน cloud ล่มแล้วข้อมูลต้องไม่หายหรือโผล่กลับมา และไม่เก็บเลขบัตรเต็มของรายการที่ซิงก์แล้วไว้ในเครื่อง
+- การตรวจว่าบอร์ดออนไลน์หรือเงียบไป การจำค่าสูงสุด และการยืนยัน threshold
+- Firebase Auth (login, refresh token, ข้อความ error) และ Firestore REST (pagination, Bearer token, 403)
+- Widget test ของฟอร์ม (checksum เลขบัตร), การบันทึกที่ขึ้นในประวัติแบบปิดเลขบัตร, ปุ่มจำลองการเป่า และหน้า login
+- **Firestore Security Rules** ทดสอบกับ Firestore Emulator ([`firestore-tests/`](firestore-tests/)) ว่าคนนอก `officers` อ่านไม่ได้ และข้อมูลผิดรูปแบบเขียนไม่ได้
 
-## สถานะและข้อจำกัด
+## Deploy เว็บเดโม
 
-โปรเจกต์นี้จัดทำขึ้นเพื่อการเรียนรู้และนำเสนอผลงาน ยังไม่ใช่อุปกรณ์ตรวจวัดที่ผ่านการรับรองทางการแพทย์หรือกฎหมาย ค่า BAC ขึ้นอยู่กับการสอบเทียบเซนเซอร์และ firmware ของอุปกรณ์ จึงไม่ควรใช้เพื่อตัดสินทางกฎหมายหรือความปลอดภัยโดยไม่มีอุปกรณ์มาตรฐานยืนยัน
+เว็บเดโม build โดยใส่เฉพาะค่า Firebase (อ่านจาก Repository variables) **ไม่ใส่ token ของ NETPIE** เว็บที่เปิดสาธารณะจึงใช้อุปกรณ์จำลองเสมอ และไม่มีใครสั่งงานบอร์ดจริงผ่านเว็บได้ ขั้นตอน deploy:
 
-ข้อมูลประวัติมีชื่อ เลขบัตรประชาชน และข้อมูลรถ การนำไปใช้จริงต้องเพิ่ม authentication, authorization, Firestore Security Rules, การปกปิดข้อมูล และนโยบายเก็บรักษาข้อมูลที่เหมาะสม แอปปัจจุบันเรียก NETPIE และ Firestore REST API จาก client โดยตรง จึงควรย้ายการดำเนินการที่สำคัญไปยัง trusted backend ก่อนใช้ใน production
+1. ตั้ง Repository variables (ค่า Firebase web config ไม่ใช่ความลับ ความปลอดภัยอยู่ที่ Security Rules)
 
-## แนวทางพัฒนาต่อ
+   ```bash
+   gh variable set APP_FIREBASE_PROJECT_ID --repo Catboyz-45/alcohol-monitor-app --body alcohol-monitor-7414d
+   ```
 
-- เพิ่มระบบสมาชิกและ Role-based access control
-- เพิ่ม backend สำหรับซ่อน NETPIE credentials และตรวจสิทธิ์ทุกคำสั่ง
-- เพิ่ม Firestore Security Rules และจำกัดการเข้าถึงข้อมูลตามผู้ใช้
-- เพิ่มการเข้ารหัสหรือ secure storage สำหรับข้อมูลสำคัญในเครื่อง
-- เพิ่ม unit, widget และ integration tests สำหรับ flow สำคัญ
-- เพิ่มการตรวจสอบรูปแบบเลขบัตรประชาชนและข้อมูลรถ
-- เพิ่มสถานะ sync และ retry queue สำหรับข้อมูลที่ยังส่งขึ้น Cloud ไม่สำเร็จ
-- เพิ่ม acknowledgment สำหรับคำสั่ง Buzzer, LED และ Threshold
-- เพิ่มการสอบเทียบเซนเซอร์และแสดงหน่วยวัดที่ตรวจสอบได้
-- ปรับ accessibility และรองรับหลายภาษา
+   ```bash
+   gh variable set APP_FIREBASE_API_KEY --repo Catboyz-45/alcohol-monitor-app --body "<web API key จาก config.json>"
+   ```
+2. เปิด **Settings → Pages → Source: GitHub Actions**
+3. ไปที่แท็บ **Actions → Deploy demo → Run workflow**
+
+ถ้าไม่ได้ตั้ง variables เว็บจะเปิดเป็นโหมดสาธิตอย่างเดียว (ไม่มีหน้าล็อกอิน)
+
+## โครงสร้างโค้ด
+
+```text
+lib/
+├── main.dart                  # AuthGate + สร้าง AppState/DeviceLink ต่อ session
+├── config.dart                # ค่าคอนฟิกจาก --dart-define รวมไว้ที่เดียว
+├── device_reading.dart        # โมเดล + ตัวแปลง payload จากบอร์ด (สัญญาข้อมูลกับ firmware)
+├── device_link.dart           # NETPIE MQTT และอุปกรณ์จำลอง
+├── mqtt_service.dart          # MQTT พร้อม auto-reconnect, ส่ง threshold และ ping
+├── auth_service.dart          # Firebase Auth ผ่าน REST (เก็บ refresh token)
+├── firestore_repository.dart  # Firestore REST + Bearer token
+├── app_state.dart             # ประวัติ + คิวซิงก์ offline + สถานะอุปกรณ์
+├── thai_id.dart               # ตรวจ checksum / ปิดเลขบัตรประชาชน
+├── *_page.dart                # หน้า login, ตรวจวัด, ประวัติ, อุปกรณ์
+└── widgets/                   # เกจ, ป้ายสถานะ, ส่วนประกอบที่ใช้ร่วมกัน
+```
+
+## ข้อจำกัดและสิ่งที่ควรรู้
+
+- เป็นต้นแบบเพื่อการเรียนรู้ ไม่ใช่เครื่องวัดที่ผ่านการรับรอง ค่า 0–100 ยังไม่ได้สอบเทียบเป็น BAC จึงห้ามใช้ตัดสินทางกฎหมาย
+- token ของ device ฝั่งแอปที่ใส่ผ่าน `--dart-define` จะฝังอยู่ในแอปที่ build ออกไป ถ้าโดนแกะไป คนอื่นจะส่ง threshold หรืออ่านค่าได้ แต่ปลอมเป็นบอร์ดไม่ได้ ถ้าจะใช้จริงควรมี backend ที่ถือ token แทนแอป
+- เลขบัตรประชาชนของรายการที่ซิงก์แล้วจะเก็บในเครื่องแค่ 3 หลักท้าย ต้องออนไลน์ถึงจะดูเลขเต็มได้
+- Firebase Web API key ไม่ใช่ความลับ ความปลอดภัยของข้อมูลมาจาก Auth และ Security Rules
+- ประวัติในเครื่องเก็บใน SharedPreferences แบบไม่เข้ารหัส (รายการที่ยังรอส่งยังมีเลขบัตรเต็ม) และจะถูกล้างเมื่อออกจากระบบ
 
 ## ผู้พัฒนา
 
-พัฒนาโดย [Catboyz-45](https://github.com/Catboyz-45) เพื่อใช้เป็นผลงานระหว่างเรียนและประกอบการสัมภาษณ์
+[Catboyz-45](https://github.com/Catboyz-45)

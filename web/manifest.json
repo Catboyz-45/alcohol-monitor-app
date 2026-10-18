@@ -1,11 +1,11 @@
 {
-    "name": "project_app_iot",
-    "short_name": "project_app_iot",
+    "name": "Alcohol Monitor",
+    "short_name": "Alcohol Monitor",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "แอปบันทึกผลตรวจแอลกอฮอล์จากอุปกรณ์ IoT (ESP32 + MQ-3 + NETPIE)",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

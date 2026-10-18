@@ -1,0 +1,50 @@
+# Deploy เว็บเดโมขึ้น GitHub Pages (Firebase จาก Repository variables, อุปกรณ์จำลอง)
+# กดรันเองจากแท็บ Actions → Deploy demo → Run workflow
+# ต้องเปิด Settings → Pages → Source: GitHub Actions ก่อนครั้งแรก
+name: Deploy demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # ใส่เฉพาะค่า Firebase (ไม่ใช่ความลับ) ไม่ใส่ token ของ NETPIE เว็บสาธารณะจึงใช้อุปกรณ์จำลอง
+      - name: Build web
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.APP_FIREBASE_PROJECT_ID }}
+          FIREBASE_API_KEY: ${{ vars.APP_FIREBASE_API_KEY }}
+        run: >-
+          flutter build web --release
+          --base-href /${{ github.event.repository.name }}/
+          --dart-define=APP_FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+          --dart-define=APP_FIREBASE_API_KEY="$FIREBASE_API_KEY"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,13 +1,11 @@
 {
   "APP_MQTT_HOST": "mqtt.netpie.io",
+  "APP_MQTT_PORT": "8883",
+  "APP_MQTT_TLS": "true",
   "APP_MQTT_WS_URL": "wss://mqtt.netpie.io:443/mqtt",
-  "APP_MQTT_USER": "your-mqtt-username",
-  "APP_MQTT_PASSWORD": "your-mqtt-password",
-  "APP_MQTT_CLIENT_ID": "",
-  "APP_NETPIE_CONTROL_CLIENT_ID": "your-control-client-id",
-  "APP_NETPIE_CONTROL_TOKEN": "your-control-token",
-  "APP_NETPIE_STATUS_CLIENT_ID": "your-status-client-id",
-  "APP_NETPIE_STATUS_TOKEN": "your-status-token",
+  "APP_MQTT_CLIENT_ID": "app-device-client-id",
+  "APP_MQTT_USER": "app-device-token",
+  "APP_MQTT_PASSWORD": "app-device-secret",
   "APP_FIREBASE_PROJECT_ID": "your-firebase-project-id",
   "APP_FIREBASE_API_KEY": "your-firebase-web-api-key"
 }

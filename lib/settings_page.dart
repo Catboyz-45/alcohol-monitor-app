@@ -1,491 +1,516 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'app_state.dart';
+import 'auth_service.dart';
+import 'config.dart';
+import 'device_link.dart';
+import 'device_reading.dart';
+import 'theme.dart';
+import 'widgets/alcohol_gauge.dart';
+import 'widgets/common.dart';
 
-class SettingsPage extends StatefulWidget {
-  const SettingsPage({
-    super.key,
-    required this.onSendThreshold,
-    required this.onSetBuzzer,
-    required this.onSetLed,
-    required this.onReconnect,
-  });
-
-  final VoidCallback onSendThreshold;
-  final void Function(bool) onSetBuzzer;
-  final void Function(bool) onSetLed;
-  final VoidCallback onReconnect;
+// หน้าอุปกรณ์: สถานะการเชื่อมต่อ, ตั้งค่า threshold, เกจค่าสด และบัญชีผู้ใช้
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  Widget build(BuildContext context) {
+    return const PageBody(
+      children: [
+        _ConnectionCard(),
+        SizedBox(height: 16),
+        _ThresholdCard(),
+        SizedBox(height: 16),
+        _GaugeCard(),
+        SizedBox(height: 16),
+        _AccountCard(),
+      ],
+    );
+  }
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  int _localThreshold1 = 20;
-  int _localThreshold2 = 50;
-  // true = ผู้ใช้แก้ค่าแล้วแต่ยังไม่ได้กดส่ง → ไม่ sync จาก AppState
-  bool _pendingEdit = false;
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard();
 
   @override
-  // โหลดค่า threshold ปัจจุบันจาก AppState มาเป็นค่าแก้ไขในหน้า settings
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final appState = Provider.of<AppState>(context, listen: false);
-      setState(() {
-        _localThreshold1 = appState.threshold;
-        _localThreshold2 = appState.threshold2;
-      });
-    });
-  }
-
-  @override
-  // สร้างหน้า settings ทั้งส่วน MQTT, threshold และ gauge
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, appState, child) {
-        // sync ค่าจาก AppState ทุกครั้งที่ polling อัปเดต ถ้าผู้ใช้ยังไม่ได้แตะ slider
-        if (!_pendingEdit) {
-          _localThreshold1 = appState.threshold;
-          _localThreshold2 = appState.threshold2;
-        }
+    final appState = context.watch<AppState>();
+    final link = appState.link;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'การตั้งค่า',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'สถานะ MQTT',
-                      style: GoogleFonts.poppins(fontSize: 18),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                appState.connected ? Colors.green : Colors.red,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            appState.connected
-                                ? 'เชื่อมต่อแล้ว'
-                                : 'ไม่ได้เชื่อมต่อ',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: widget.onReconnect,
-                          icon: const Icon(Icons.refresh),
-                          tooltip: 'เชื่อมต่อใหม่',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ค่ามาตรฐานเตือนแอลกอฮอล์',
-                      style: GoogleFonts.poppins(fontSize: 18),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'กาหนดค่าเกณฑ์ที่จะแจ้งเตือนเมื่อตรวจพบแอลกอฮอล์',
-                      style: TextStyle(fontSize: 14, color: Colors.white70),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Threshold 1: $_localThreshold1',
-                      style: GoogleFonts.poppins(fontSize: 16),
-                    ),
-                    Slider(
-                      min: 1,
-                      max: 100,
-                      divisions: 99,
-                      value: _localThreshold1.toDouble().clamp(1, 100),
-                      label: _localThreshold1.toString(),
-                      onChanged: (value) {
-                        setState(() {
-                          _pendingEdit = true;
-                          _localThreshold1 = value.toInt();
-                          // บังคับลำดับให้ threshold1 <= threshold2
-                          if (_localThreshold1 > _localThreshold2) {
-                            _localThreshold2 = _localThreshold1;
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Threshold 2: $_localThreshold2',
-                      style: GoogleFonts.poppins(fontSize: 16),
-                    ),
-                    Slider(
-                      min: 1,
-                      max: 100,
-                      divisions: 99,
-                      value: _localThreshold2.toDouble().clamp(1, 100),
-                      label: _localThreshold2.toString(),
-                      onChanged: (value) {
-                        setState(() {
-                          _pendingEdit = true;
-                          _localThreshold2 = value.toInt();
-                          // บังคับลำดับให้ threshold1 <= threshold2
-                          if (_localThreshold2 < _localThreshold1) {
-                            _localThreshold1 = _localThreshold2;
-                          }
-                        });
-                      },
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          '$_localThreshold1 / $_localThreshold2',
-                          style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent,
-                          ),
-                        ),
-                        const Spacer(),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            // อัปเดตค่าใน AppState ก่อนส่งขึ้นอุปกรณ์
-                            appState.updateThreshold(_localThreshold1);
-                            appState.updateThreshold2(_localThreshold2);
-                            setState(() => _pendingEdit = false);
-                            widget.onSendThreshold();
-                          },
-                          icon: const Icon(Icons.send),
-                          label: const Text('ส่งค่ามาตรฐาน'),
-                          style: ElevatedButton.styleFrom(
-                            // การ์ดพื้นฐานของหน้านี้ ใช้ซ้ำทุก section
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Alcohol Panel',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Current BAC',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      (appState.latestBoardAlcohol ?? appState.alcohol)
-                          .clamp(0.0, 100.0)
-                          .toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Text(
-                      'BAC',
-                      style: TextStyle(fontSize: 18, color: Colors.white70),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 220,
-                      child: _buildGaugePanel(
-                        bacValue:
-                            appState.latestBoardAlcohol ?? appState.alcohol,
-                        threshold1: appState.threshold.toDouble(),
-                        threshold2: appState.threshold2.toDouble(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        _buildLegendItem('Threshold 1', Colors.greenAccent),
-                        _buildLegendItem('Threshold 2', Colors.amberAccent),
-                        _buildLegendItem('Danger', Colors.redAccent),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      appState.lastUpdate == null
-                          ? 'อัปเดตล่าสุด: -'
-                          : 'อัปเดตล่าสุด: ${_formatDateTime(appState.lastUpdate!)}',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+    final outline = Theme.of(context).colorScheme.outline;
+    final mqtt =
+        appState.isDemo
+            ? ('จำลอง', AlertStatus.safe.color)
+            : !AppConfig.hasMqtt
+            ? ('ไม่ได้ตั้งค่า', outline)
+            : switch (appState.mqttConnected) {
+              true => ('เชื่อมต่อแล้ว', AlertStatus.safe.color),
+              false => ('ไม่ได้เชื่อมต่อ', AlertStatus.danger.color),
+              null => ('กำลังเชื่อมต่อ', outline),
+            };
 
-  Widget _buildCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: child,
-    );
-  }
-
-  // สร้าง panel gauge โดย normalize ค่าและปรับขนาดตามพื้นที่
-  Widget _buildGaugePanel({
-    required double bacValue,
-    required double threshold1,
-    required double threshold2,
-  }) {
-    // คุมค่าให้อยู่ช่วง 0-100 ก่อนวาด
-    final normalizedValue = bacValue.clamp(0.0, 100.0);
-    final normalizedThreshold1 = threshold1.clamp(0.0, 100.0);
-    final normalizedThreshold2 = threshold2.clamp(0.0, 100.0);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // จำกัดความกว้างสูงสุดเพื่อคงสัดส่วน gauge
-        final gaugeWidth = math.min(constraints.maxWidth, 360.0);
-        final gaugeHeight = gaugeWidth * 0.62;
-
-        return Stack(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: CustomPaint(
-                size: Size(gaugeWidth, gaugeHeight),
-                painter: _GaugePainter(
-                  value: normalizedValue,
-                  threshold1: normalizedThreshold1,
-                  threshold2: normalizedThreshold2,
+            SectionTitle(
+              'การเชื่อมต่อ',
+              subtitle:
+                  'ข้อมูลล่าสุด ${timeAgo(appState.lastUpdate, now: appState.now())}',
+              trailing: IconButton(
+                tooltip: 'ขอสถานะล่าสุดจากบอร์ด',
+                icon: const Icon(Icons.refresh),
+                onPressed: () => context.read<DeviceLink>().refresh(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _StatusRow(
+              icon: Icons.memory,
+              label: 'บอร์ด ESP32',
+              value: linkLabel(link),
+              color: linkColor(link),
+            ),
+            _StatusRow(
+              icon: Icons.bolt_outlined,
+              label: 'NETPIE MQTT',
+              value: mqtt.$1,
+              color: mqtt.$2,
+            ),
+            if (link == LinkState.stale)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'แอปต่อ NETPIE ได้ แต่บอร์ดไม่ได้ส่งข้อมูลเกิน '
+                  '${AppState.staleAfter.inSeconds} วินาที ตรวจว่าบอร์ดเปิดอยู่และต่อ Wi-Fi ได้',
+                  style: TextStyle(color: linkColor(link)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThresholdCard extends StatefulWidget {
+  const _ThresholdCard();
+
+  @override
+  State<_ThresholdCard> createState() => _ThresholdCardState();
+}
+
+class _ThresholdCardState extends State<_ThresholdCard> {
+  double? _t1;
+  double? _t2;
+  bool _sending = false;
+
+  Future<void> _send(AppState appState) async {
+    final t1 = _t1 ?? appState.threshold1;
+    final t2 = _t2 ?? appState.threshold2;
+    setState(() => _sending = true);
+    try {
+      await context.read<DeviceLink>().sendThresholds(t1, t2);
+      if (mounted) {
+        setState(() {
+          _t1 = null;
+          _t2 = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('ส่งค่าไม่สำเร็จ: $e'),
+              backgroundColor: AlertStatus.danger.color,
+            ),
+          );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final theme = Theme.of(context);
+    // ใช้ค่าที่อุปกรณ์รายงาน จนกว่าผู้ใช้จะเริ่มลาก slider
+    final t1 = _t1 ?? appState.threshold1;
+    final t2 = _t2 ?? appState.threshold2;
+    final edited = _t1 != null || _t2 != null;
+    final canSend =
+        appState.isDemo ||
+        (AppConfig.hasMqtt && appState.mqttConnected == true);
+
+    Widget ackStatus() {
+      if (!canSend) {
+        return Text(
+          AppConfig.hasMqtt
+              ? 'ต้องเชื่อมต่อ MQTT ก่อนจึงจะส่งค่าไปที่บอร์ดได้'
+              : 'ยังไม่ได้ตั้งค่า APP_MQTT_* จึงส่งค่าไปที่บอร์ดไม่ได้',
+          style: TextStyle(color: theme.colorScheme.outline),
+        );
+      }
+      if (appState.pendingThresholds != null) {
+        final overdue = appState.thresholdsAckOverdue;
+        return Row(
+          children: [
+            if (!overdue)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(Icons.schedule, size: 16, color: AlertStatus.warning.color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                overdue
+                    ? 'อุปกรณ์ยังไม่ยืนยันค่าใหม่ ตรวจว่าบอร์ดออนไลน์อยู่'
+                    : 'ส่งแล้ว รออุปกรณ์ยืนยัน…',
+                style: TextStyle(
+                  color: overdue ? AlertStatus.warning.color : null,
                 ),
               ),
             ),
           ],
         );
-      },
-    );
-  }
+      }
+      if (appState.thresholdsConfirmedAt != null) {
+        return Row(
+          children: [
+            Icon(Icons.check_circle, size: 16, color: AlertStatus.safe.color),
+            const SizedBox(width: 8),
+            Text(
+              'อุปกรณ์รับค่าแล้ว ${timeAgo(appState.thresholdsConfirmedAt, now: appState.now())}',
+              style: TextStyle(color: AlertStatus.safe.color),
+            ),
+          ],
+        );
+      }
+      return Text(
+        'ค่าที่แสดงคือค่าที่บอร์ดใช้อยู่ตอนนี้',
+        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
 
-  // แสดง legend สีของแต่ละช่วงค่า
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionTitle(
+              'เกณฑ์แจ้งเตือน',
+              subtitle: 'บอร์ดเปิดไฟเตือนเมื่อค่าถึงเกณฑ์ (สเกล 0–100)',
+            ),
+            const SizedBox(height: 12),
+            _ThresholdSlider(
+              label: 'เกณฑ์เฝ้าระวัง',
+              color: AlertStatus.warning.color,
+              value: t1,
+              onChanged:
+                  (value) => setState(() {
+                    _t1 = value;
+                    if (value > t2) {
+                      _t2 = value;
+                    }
+                  }),
+            ),
+            _ThresholdSlider(
+              label: 'เกณฑ์เกิน',
+              color: AlertStatus.danger.color,
+              value: t2,
+              onChanged:
+                  (value) => setState(() {
+                    _t2 = value;
+                    if (value < t1) {
+                      _t1 = value;
+                    }
+                  }),
+            ),
+            const SizedBox(height: 8),
+            ackStatus(),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (edited)
+                  TextButton(
+                    onPressed:
+                        () => setState(() {
+                          _t1 = null;
+                          _t2 = null;
+                        }),
+                    child: const Text('ยกเลิก'),
+                  ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed:
+                      !canSend || _sending || !edited
+                          ? null
+                          : () => _send(appState),
+                  icon:
+                      _sending
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.send),
+                  label: const Text('ส่งไปที่บอร์ด'),
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: Colors.white70)),
-      ],
+      ),
     );
-  }
-
-  // ฟอร์แมตวันที่ภาษาไทยแบบอ่านง่าย
-  String _formatDateTime(DateTime dateTime) {
-    const months = [
-      'ม.ค.',
-      'ก.พ.',
-      'มี.ค.',
-      'เม.ย.',
-      'พ.ค.',
-      'มิ.ย.',
-      'ก.ค.',
-      'ส.ค.',
-      'ก.ย.',
-      'ต.ค.',
-      'พ.ย.',
-      'ธ.ค.',
-    ];
-
-    return '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year} '
-        'เวลา ${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
 
-class _GaugePainter extends CustomPainter {
-  _GaugePainter({
+class _ThresholdSlider extends StatelessWidget {
+  const _ThresholdSlider({
+    required this.label,
+    required this.color,
     required this.value,
-    required this.threshold1,
-    required this.threshold2,
+    required this.onChanged,
   });
 
+  final String label;
+  final Color color;
   final double value;
-  final double threshold1;
-  final double threshold2;
+  final ValueChanged<double> onChanged;
 
   @override
-  // วาดครึ่งวงกลม gauge พร้อม segment และเข็มชี้ค่า BAC
-  void paint(Canvas canvas, Size size) {
-    const startAngle = math.pi;
-    const sweepAngle = math.pi;
-    final center = Offset(size.width / 2, size.height - 8);
-    final radius = math.min(size.width / 2 - 12, size.height - 12);
-
-    final trackPaint =
-        Paint()
-          ..color = Colors.white12
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 16
-          ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      trackPaint,
-    );
-
-    // วาดโซนปลอดภัย/เตือน/อันตรายตาม threshold
-    _drawSegment(
-      canvas,
-      center,
-      radius,
-      startAngle,
-      threshold1 / 100 * sweepAngle,
-      Colors.greenAccent,
-    );
-    _drawSegment(
-      canvas,
-      center,
-      radius,
-      startAngle + threshold1 / 100 * sweepAngle,
-      (threshold2 - threshold1).clamp(0.0, 100.0) / 100 * sweepAngle,
-      Colors.amberAccent,
-    );
-    _drawSegment(
-      canvas,
-      center,
-      radius,
-      startAngle + threshold2 / 100 * sweepAngle,
-      (100 - threshold2).clamp(0.0, 100.0) / 100 * sweepAngle,
-      Colors.redAccent,
-    );
-
-    // คำนวณปลายเข็มจากมุมตามค่า value ปัจจุบัน
-    final needleAngle = startAngle + (value / 100 * sweepAngle);
-    final needleLength = radius - 18;
-    final needleEnd = Offset(
-      center.dx + needleLength * math.cos(needleAngle),
-      center.dy + needleLength * math.sin(needleAngle),
-    );
-
-    final needlePaint =
-        Paint()
-          ..color = Colors.white
-          ..strokeWidth = 4
-          ..strokeCap = StrokeCap.round;
-    canvas.drawLine(center, needleEnd, needlePaint);
-    canvas.drawCircle(center, 7, Paint()..color = Colors.white);
-
-    final labelStyle = const TextStyle(color: Colors.white60, fontSize: 14);
-    _paintLabel(canvas, '0', Offset(18, size.height - 6), labelStyle);
-    _paintLabel(
-      canvas,
-      '100',
-      Offset(size.width - 52, size.height - 6),
-      labelStyle,
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label)),
+            Text(
+              value.round().toString(),
+              style: TextStyle(
+                color: color,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          min: 1,
+          max: kScaleMax,
+          divisions: 99,
+          activeColor: color,
+          value: value.clamp(1, kScaleMax),
+          label: value.round().toString(),
+          semanticFormatterCallback: (v) => '$label ${v.round()}',
+          onChanged: (v) => onChanged(v.roundToDouble()),
+        ),
+      ],
     );
   }
+}
 
-  // วาด arc segment ทีละช่วงของ gauge
-  void _drawSegment(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double start,
-    double sweep,
-    Color color,
-  ) {
-    if (sweep <= 0) {
+class _GaugeCard extends StatelessWidget {
+  const _GaugeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final latest = appState.latest;
+
+    Widget legend(AlertStatus status) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: status.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(status.label),
+      ],
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionTitle(
+              'ค่าสดจากเซนเซอร์',
+              trailing: latest == null ? null : StatusPill(latest.status),
+            ),
+            const SizedBox(height: 16),
+            AlcoholGauge(
+              value: latest?.bac ?? 0,
+              threshold1: appState.threshold1,
+              threshold2: appState.threshold2,
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                latest == null ? '–' : latest.bac.toStringAsFixed(1),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Center(
+              child: Text(
+                latest?.raw == null
+                    ? 'สเกล 0–100'
+                    : 'ค่า ADC ดิบ ${latest!.raw}',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 16,
+              runSpacing: 8,
+              children: [for (final s in AlertStatus.values) legend(s)],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'ค่าในแอปเป็นสเกลเชิงเส้นจาก ADC ของ MQ-3 ยังไม่ได้สอบเทียบเป็นค่า BAC '
+              'จึงไม่ควรใช้ตัดสินทางกฎหมาย',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountCard extends StatelessWidget {
+  const _AccountCard();
+
+  Future<void> _signOut(BuildContext context) async {
+    final appState = context.read<AppState>();
+    final auth = context.read<AuthService>();
+    final pending = appState.hasCloud ? appState.pendingSyncCount : 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(
+              auth.mode == AuthMode.demo ? 'ออกจากโหมดสาธิต?' : 'ออกจากระบบ?',
+            ),
+            content: Text(
+              pending > 0
+                  ? 'ยังมี $pending รายการที่ยังไม่ได้ส่งขึ้น cloud '
+                      'ถ้าออกตอนนี้ข้อมูลเหล่านี้จะหายจากเครื่อง'
+                  : 'ข้อมูลประวัติที่เก็บในเครื่องนี้จะถูกล้าง',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('ออก'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) {
       return;
     }
-
-    final paint =
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 16
-          ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      start,
-      sweep,
-      false,
-      paint,
-    );
-  }
-
-  // วาดตัวเลขปลายสเกลบน gauge
-  void _paintLabel(Canvas canvas, String text, Offset offset, TextStyle style) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(canvas, offset);
+    await appState.clearLocalData();
+    await auth.signOut();
   }
 
   @override
-  // วาดใหม่เฉพาะเมื่อค่าหลักเปลี่ยน ช่วยลดงาน render
-  bool shouldRepaint(covariant _GaugePainter oldDelegate) {
-    return oldDelegate.value != value ||
-        oldDelegate.threshold1 != threshold1 ||
-        oldDelegate.threshold2 != threshold2;
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthService>();
+    final (String title, String subtitle) = switch (auth.mode) {
+      AuthMode.signedIn => (
+        auth.email ?? 'เจ้าหน้าที่',
+        'ข้อมูลซิงก์กับ Cloud Firestore',
+      ),
+      AuthMode.demo => ('โหมดสาธิต', 'อุปกรณ์จำลอง · ข้อมูลอยู่ในเครื่องนี้'),
+      _ => ('ไม่ได้ตั้งค่า Firebase', 'ประวัติเก็บในเครื่องนี้เท่านั้น'),
+    };
+    final canLeave =
+        auth.mode == AuthMode.signedIn || auth.mode == AuthMode.demo;
+
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing:
+            canLeave
+                ? TextButton(
+                  onPressed: () => _signOut(context),
+                  child: Text(
+                    auth.mode == AuthMode.demo ? 'ออกจากโหมด' : 'ออกจากระบบ',
+                  ),
+                )
+                : null,
+      ),
+    );
   }
 }
