@@ -4,7 +4,14 @@
 
 ผลงานรายวิชา 02739342 Application Development for Mobile Devices · โค้ดฝั่งบอร์ดอยู่ที่ [alcohol-monitor-firmware](https://github.com/Catboyz-45/alcohol-monitor-firmware)
 
-**ลองใช้ได้ทันที:** [เว็บเดโม](https://catboyz-45.github.io/alcohol-monitor-app/) → กด **"ทดลองใช้โหมดสาธิต"** (ใช้อุปกรณ์จำลอง ไม่ต้องมีบอร์ดหรือบัญชี)
+**ลองใช้ได้ทันที:** [เว็บเดโม](https://catboyz-45.github.io/alcohol-monitor-app/)
+
+| วิธีเข้า | ใช้ทำอะไร |
+| --- | --- |
+| อีเมล `demo@alcohol-monitor.test` รหัส `12345678` | ล็อกอินจริงด้วย Firebase Auth บันทึกและซิงก์ประวัติกับ Cloud Firestore |
+| ปุ่ม **"ทดลองใช้โหมดสาธิต"** | ไม่ต้องมีบัญชี เก็บข้อมูลไว้ในเบราว์เซอร์อย่างเดียว |
+
+ทั้งสองแบบใช้อุปกรณ์จำลอง (กด "จำลองการเป่า" ได้) ข้อมูลทั้งหมดในระบบเดโมเป็นข้อมูลสมมติ และบัญชีทดลองใช้ร่วมกันทุกคน **อย่ากรอกชื่อหรือเลขบัตรของคนจริง**
 
 | เข้าสู่ระบบ | ตรวจวัด | ประวัติ | รายละเอียด | อุปกรณ์ |
 | --- | --- | --- | --- | --- |
@@ -96,7 +103,7 @@ firebase deploy --only firestore:rules --project <your-project-id>
 
 ### บัญชีทดลอง
 
-เว็บเดโมไม่ต้องใช้บัญชี กด "ทดลองใช้โหมดสาธิต" ได้เลย ส่วนบัญชีสำหรับทดสอบกับ Firebase จริง ให้สร้างตามขั้นตอนด้านบน แล้วเพิ่ม `officers/{uid}` ให้บัญชีนั้น
+บัญชี `demo@alcohol-monitor.test` (รหัส `12345678`) สร้างไว้ใน Firebase ของเดโมแล้ว และมีเอกสาร `officers/{uid}` ที่มี `role: "demo"` ถ้าจะใช้กับ Firebase project ของตัวเอง ให้สร้างบัญชีตามขั้นตอนด้านบน แล้วเพิ่ม `officers/{uid}` ให้บัญชีนั้น
 
 ## การทดสอบ
 
@@ -122,10 +129,21 @@ cd firestore-tests && npm ci && npm test
 
 ## Deploy เว็บเดโม
 
-เว็บเดโม build แบบไม่มี credential (จึงเป็นโหมดสาธิตเสมอ) ขั้นตอน deploy:
+เว็บเดโม build โดยใส่เฉพาะค่า Firebase (อ่านจาก Repository variables) **ไม่ใส่ token ของ NETPIE** เว็บที่เปิดสาธารณะจึงใช้อุปกรณ์จำลองเสมอ และไม่มีใครสั่งงานบอร์ดจริงผ่านเว็บได้ ขั้นตอน deploy:
 
-1. เปิด **Settings → Pages → Source: GitHub Actions**
-2. ไปที่แท็บ **Actions → Deploy demo → Run workflow**
+1. ตั้ง Repository variables (ค่า Firebase web config ไม่ใช่ความลับ ความปลอดภัยอยู่ที่ Security Rules)
+
+   ```bash
+   gh variable set APP_FIREBASE_PROJECT_ID --repo Catboyz-45/alcohol-monitor-app --body alcohol-monitor-7414d
+   ```
+
+   ```bash
+   gh variable set APP_FIREBASE_API_KEY --repo Catboyz-45/alcohol-monitor-app --body "<web API key จาก config.json>"
+   ```
+2. เปิด **Settings → Pages → Source: GitHub Actions**
+3. ไปที่แท็บ **Actions → Deploy demo → Run workflow**
+
+ถ้าไม่ได้ตั้ง variables เว็บจะเปิดเป็นโหมดสาธิตอย่างเดียว (ไม่มีหน้าล็อกอิน)
 
 ## โครงสร้างโค้ด
 
