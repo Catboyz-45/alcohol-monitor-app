@@ -128,6 +128,34 @@ void main() {
       expect(real.records, isEmpty);
     });
 
+    test('รายการที่ซิงก์แล้วไม่เก็บเลขบัตรเต็มในเครื่อง', () async {
+      final remote = FakeRemote();
+      final state = AppState(remote: remote);
+      await state.addRecord(record('synced'));
+      remote.online = false;
+      await state.addRecord(record('pending', minute: 1));
+
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString('measurement_records')!;
+      // รายการที่รอส่งต้องเก็บเลขเต็มไว้ส่ง ส่วนที่ซิงก์แล้วเหลือ 3 หลักท้าย
+      expect(RegExp('1101700203450').allMatches(stored), hasLength(1));
+      expect(stored, contains('XXXXXXXXXX450'));
+
+      // เปิดแอปออฟไลน์ เห็นแบบปิดไว้ พอออนไลน์ก็ได้เลขเต็มจาก cloud
+      final reopened = AppState(remote: remote);
+      await reopened.loadRecords();
+      final synced = reopened.records.firstWhere((r) => r.id == 'synced');
+      expect(synced.idCard, 'XXXXXXXXXX450');
+
+      remote.online = true;
+      await reopened.syncNow();
+      expect(
+        reopened.records.firstWhere((r) => r.id == 'synced').idCard,
+        '1101700203450',
+      );
+      expect(remote.docs['pending']!.idCard, '1101700203450');
+    });
+
     test('ออกจากระบบแล้วล้างข้อมูลในเครื่อง', () async {
       final state = AppState();
       await state.addRecord(record('x'));
@@ -140,7 +168,7 @@ void main() {
   });
 
   group('สถานะอุปกรณ์', () {
-    test('online เมื่อได้ข้อมูลสด และ stale เมื่อเงียบเกิน 10 วินาที', () {
+    test('online เมื่อได้ข้อมูลสด และ stale เมื่อเงียบเกิน 12 วินาที', () {
       var now = DateTime(2026, 10, 18, 12);
       final state = AppState(clock: () => now);
       expect(state.link, LinkState.connecting);
@@ -149,21 +177,19 @@ void main() {
       expect(state.link, LinkState.online);
 
       now = now.add(const Duration(seconds: 11));
+      expect(state.link, LinkState.online);
+
+      now = now.add(const Duration(seconds: 2));
       expect(state.link, LinkState.stale);
     });
 
-    test('ค่าเก่าค้างใน shadow ไม่นับว่าอุปกรณ์ออนไลน์', () {
+    test('MQTT หลุดแสดงว่าไม่ได้เชื่อมต่อทันที แม้เพิ่งได้ข้อมูล', () {
       final state = AppState();
-      state.applyReading(reading(30), fresh: false);
-      expect(state.latest?.bac, 30);
-      expect(state.link, LinkState.connecting);
-      expect(state.peakBac, isNull);
-    });
+      state.setMqttConnected(true);
+      state.applyReading(reading(5));
+      expect(state.link, LinkState.online);
 
-    test('offline เมื่อ MQTT และ REST ใช้ไม่ได้ทั้งคู่', () {
-      final state = AppState();
       state.setMqttConnected(false);
-      state.setRestOk(false);
       expect(state.link, LinkState.offline);
     });
 

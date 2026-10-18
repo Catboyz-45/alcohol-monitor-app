@@ -45,7 +45,7 @@ class StatusPill extends StatelessWidget {
 String linkLabel(LinkState link) => switch (link) {
   LinkState.online => 'อุปกรณ์ออนไลน์',
   LinkState.stale => 'อุปกรณ์ไม่ส่งข้อมูล',
-  LinkState.offline => 'เชื่อมต่อไม่ได้',
+  LinkState.offline => 'ไม่ได้เชื่อมต่อ',
   LinkState.connecting => 'กำลังเชื่อมต่อ',
 };
 

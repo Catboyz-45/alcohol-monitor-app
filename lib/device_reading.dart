@@ -1,9 +1,9 @@
-// โมเดลค่าที่อุปกรณ์ส่งมา ใช้ร่วมกันทั้ง MQTT, NETPIE Shadow และอุปกรณ์จำลอง
+// โมเดลค่าที่อุปกรณ์ส่งมา ใช้ร่วมกันทั้ง MQTT และอุปกรณ์จำลอง
 //
-// รูปแบบ payload จาก firmware (alcohol-monitor-firmware):
-//   @msg/home/device_status : {bac, raw, threshold1, threshold2, alertLevel, millis}
-//   Shadow (REST)           : {data: {bac, raw, threshold1, threshold2, alertLevel, uptime, ...}}
-// firmware รุ่นเก่าไม่ส่ง alertLevel/raw ใน shadow จึงต้องคำนวณเองเมื่อไม่มี
+// ข้อตกลงกับ firmware (alcohol-monitor-firmware) ผ่าน NETPIE MQTT:
+//   บอร์ด → แอป  @msg/home/device_status : {bac, raw, threshold1, threshold2, alertLevel, millis}
+//                (ส่งเมื่อมีการเป่า, heartbeat ทุก 5 วินาที และตอบทันทีเมื่อได้ ping)
+//   แอป → บอร์ด  @msg/home/device_control : {threshold1, threshold2} หรือ {ping: 1}
 
 // ค่าต่ำสุด/สูงสุดของสเกลที่ firmware ใช้ (ADC 0-4095 แปลงเป็น 0-100)
 const double kScaleMax = 100.0;
@@ -61,6 +61,13 @@ int alertLevelFor(double value, double threshold1, double threshold2) {
   return 0;
 }
 
+// คุมช่วงค่าให้อยู่ใน 0-100 และเรียง threshold1 <= threshold2 ก่อนส่งให้บอร์ด
+Map<String, double> thresholdPayload(double t1, double t2) {
+  final a = t1.clamp(0.0, kScaleMax).toDouble();
+  final b = t2.clamp(0.0, kScaleMax).toDouble();
+  return {'threshold1': a <= b ? a : b, 'threshold2': a <= b ? b : a};
+}
+
 class DeviceReading {
   final double bac;
   final int? raw;
@@ -68,21 +75,17 @@ class DeviceReading {
   final double threshold2;
   final int alertLevel;
 
-  // เวลาที่บอร์ดเปิดมาแล้ว (ms) ใช้ดูว่าข้อมูลใน shadow ยังสดอยู่ไหม
-  final int? uptimeMs;
-
   const DeviceReading({
     required this.bac,
     required this.threshold1,
     required this.threshold2,
     required this.alertLevel,
     this.raw,
-    this.uptimeMs,
   });
 
   AlertStatus get status => AlertStatusCode.fromLevel(alertLevel);
 
-  // แปลง payload ได้ทั้งแบบมี data ซ้อน (shadow) และแบบแบน (MQTT)
+  // แปลง payload ของบอร์ด (รับแบบมี data ซ้อนแบบ shadow ได้ด้วย)
   // คืน null ถ้า payload ไม่มีค่าการวัดเลย
   static DeviceReading? tryParse(Object? decoded) {
     if (decoded is! Map) {
@@ -95,9 +98,7 @@ class DeviceReading {
             : map;
 
     final raw = _asInt(source['raw']);
-    final bacValue = _asDouble(
-      source['bac'] ?? source['alcohol'] ?? source['alcoholValue'],
-    );
+    final bacValue = _asDouble(source['bac']);
     final bac = bacValue ?? (raw == null ? null : raw / kAdcMax * kScaleMax);
     if (bac == null) {
       return null;
@@ -119,7 +120,6 @@ class DeviceReading {
       threshold2: t2.clamp(0.0, kScaleMax).toDouble(),
       alertLevel:
           _asInt(source['alertLevel']) ?? alertLevelFor(clampedBac, t1, t2),
-      uptimeMs: _asInt(source['uptime'] ?? map['millis'] ?? source['millis']),
     );
   }
 

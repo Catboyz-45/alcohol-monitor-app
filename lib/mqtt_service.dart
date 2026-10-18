@@ -8,9 +8,10 @@ import 'device_reading.dart';
 import 'mqtt_client_factory.dart';
 
 // topic ที่ firmware publish ผลวัดและ heartbeat (ต้องอยู่ group เดียวกันใน NETPIE)
-// หมายเหตุ: @shadow/data/update เป็น topic สำหรับ "เขียน" shadow ของตัวเอง
-// subscribe แล้วไม่ได้ข้อมูลของอุปกรณ์ตัวอื่น จึงอ่าน shadow ผ่าน REST แทน
 const String kDeviceStatusTopic = '@msg/home/device_status';
+
+// topic ที่ firmware subscribe รับ threshold และ ping
+const String kDeviceControlTopic = '@msg/home/device_control';
 
 class MqttService {
   final String clientId;
@@ -29,6 +30,9 @@ class MqttService {
     required this.onReading,
     required this.onConnectionChanged,
   });
+
+  bool get isConnected =>
+      _client?.connectionStatus?.state == MqttConnectionState.connected;
 
   // แปลง payload ดิบจาก broker เป็น DeviceReading (null ถ้า format ผิด)
   static DeviceReading? parsePayload(String payload) {
@@ -56,7 +60,11 @@ class MqttService {
     client.onConnected = () => onConnectionChanged(true);
     client.onDisconnected = () => onConnectionChanged(false);
     client.onAutoReconnect = () => onConnectionChanged(false);
-    client.onAutoReconnected = () => onConnectionChanged(true);
+    client.onAutoReconnected = () {
+      onConnectionChanged(true);
+      // ขอสถานะล่าสุดทันที ไม่ต้องรอ heartbeat รอบถัดไป
+      ping();
+    };
     client.connectionMessage =
         MqttConnectMessage()
             .withClientIdentifier(clientId)
@@ -70,13 +78,39 @@ class MqttService {
       client.disconnect();
     }
 
-    if (client.connectionStatus?.state != MqttConnectionState.connected) {
+    if (!isConnected) {
       onConnectionChanged(false);
       return;
     }
 
     client.subscribe(kDeviceStatusTopic, MqttQos.atMostOnce);
     _updates = client.updates?.listen(_onMessage);
+    ping();
+  }
+
+  // ขอให้บอร์ดส่งสถานะกลับมาทันที (บอร์ดตอบที่ device_status)
+  void ping() => _publishControl(const {'ping': 1});
+
+  // ส่ง threshold ไปที่บอร์ด
+  void sendThresholds(double threshold1, double threshold2) {
+    if (!isConnected) {
+      throw StateError('ยังไม่ได้เชื่อมต่อ MQTT');
+    }
+    _publishControl(thresholdPayload(threshold1, threshold2));
+  }
+
+  void _publishControl(Map<String, Object> payload) {
+    final client = _client;
+    if (client == null || !isConnected) {
+      return;
+    }
+    final builder =
+        MqttClientPayloadBuilder()..addUTF8String(json.encode(payload));
+    client.publishMessage(
+      kDeviceControlTopic,
+      MqttQos.atLeastOnce,
+      builder.payload!,
+    );
   }
 
   void _onMessage(List<MqttReceivedMessage<MqttMessage>> events) {

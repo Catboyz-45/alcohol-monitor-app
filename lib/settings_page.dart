@@ -38,24 +38,17 @@ class _ConnectionCard extends StatelessWidget {
     final appState = context.watch<AppState>();
     final link = appState.link;
 
+    final outline = Theme.of(context).colorScheme.outline;
     final mqtt =
         appState.isDemo
             ? ('จำลอง', AlertStatus.safe.color)
             : !AppConfig.hasMqtt
-            ? ('ไม่ได้ตั้งค่า', Theme.of(context).colorScheme.outline)
-            : appState.mqttConnected
-            ? ('เชื่อมต่อแล้ว', AlertStatus.safe.color)
-            : ('ไม่ได้เชื่อมต่อ', AlertStatus.danger.color);
-    final rest =
-        appState.isDemo
-            ? ('จำลอง', AlertStatus.safe.color)
-            : !AppConfig.hasNetpieStatus
-            ? ('ไม่ได้ตั้งค่า', Theme.of(context).colorScheme.outline)
-            : appState.restOk == true
-            ? ('ตอบกลับปกติ', AlertStatus.safe.color)
-            : appState.restOk == false
-            ? ('ติดต่อไม่ได้', AlertStatus.danger.color)
-            : ('กำลังตรวจสอบ', Theme.of(context).colorScheme.outline);
+            ? ('ไม่ได้ตั้งค่า', outline)
+            : switch (appState.mqttConnected) {
+              true => ('เชื่อมต่อแล้ว', AlertStatus.safe.color),
+              false => ('ไม่ได้เชื่อมต่อ', AlertStatus.danger.color),
+              null => ('กำลังเชื่อมต่อ', outline),
+            };
 
     return Card(
       child: Padding(
@@ -68,7 +61,7 @@ class _ConnectionCard extends StatelessWidget {
               subtitle:
                   'ข้อมูลล่าสุด ${timeAgo(appState.lastUpdate, now: appState.now())}',
               trailing: IconButton(
-                tooltip: 'ดึงสถานะล่าสุด',
+                tooltip: 'ขอสถานะล่าสุดจากบอร์ด',
                 icon: const Icon(Icons.refresh),
                 onPressed: () => context.read<DeviceLink>().refresh(),
               ),
@@ -82,21 +75,15 @@ class _ConnectionCard extends StatelessWidget {
             ),
             _StatusRow(
               icon: Icons.bolt_outlined,
-              label: 'MQTT (เรียลไทม์)',
+              label: 'NETPIE MQTT',
               value: mqtt.$1,
               color: mqtt.$2,
-            ),
-            _StatusRow(
-              icon: Icons.cloud_outlined,
-              label: 'NETPIE Shadow',
-              value: rest.$1,
-              color: rest.$2,
             ),
             if (link == LinkState.stale)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'NETPIE ยังตอบกลับ แต่บอร์ดไม่ได้อัปเดตข้อมูลเกิน '
+                  'แอปต่อ NETPIE ได้ แต่บอร์ดไม่ได้ส่งข้อมูลเกิน '
                   '${AppState.staleAfter.inSeconds} วินาที ตรวจว่าบอร์ดเปิดอยู่และต่อ Wi-Fi ได้',
                   style: TextStyle(color: linkColor(link)),
                 ),
@@ -197,12 +184,16 @@ class _ThresholdCardState extends State<_ThresholdCard> {
     final t1 = _t1 ?? appState.threshold1;
     final t2 = _t2 ?? appState.threshold2;
     final edited = _t1 != null || _t2 != null;
-    final canSend = appState.isDemo || AppConfig.hasNetpieControl;
+    final canSend =
+        appState.isDemo ||
+        (AppConfig.hasMqtt && appState.mqttConnected == true);
 
     Widget ackStatus() {
       if (!canSend) {
         return Text(
-          'ยังไม่ได้ตั้งค่า APP_NETPIE_CONTROL_* จึงส่งค่าไปอุปกรณ์ไม่ได้',
+          AppConfig.hasMqtt
+              ? 'ต้องเชื่อมต่อ MQTT ก่อนจึงจะส่งค่าไปที่บอร์ดได้'
+              : 'ยังไม่ได้ตั้งค่า APP_MQTT_* จึงส่งค่าไปที่บอร์ดไม่ได้',
           style: TextStyle(color: theme.colorScheme.outline),
         );
       }

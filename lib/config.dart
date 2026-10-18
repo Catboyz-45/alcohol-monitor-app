@@ -3,7 +3,8 @@
 class AppConfig {
   const AppConfig._();
 
-  // MQTT (NETPIE) — client id ต้องเป็น Client ID ของ device ฝั่งแอปใน NETPIE
+  // MQTT (NETPIE) — ใช้ credential ของ device ฝั่งแอปเท่านั้น (อยู่ group เดียวกับบอร์ด)
+  // ไม่ต้องใช้ token ของบอร์ด จึงไม่มีใครแกะจากแอปไปปลอมเป็นบอร์ดได้
   static const String mqttHost = String.fromEnvironment(
     'APP_MQTT_HOST',
     defaultValue: 'mqtt.netpie.io',
@@ -28,29 +29,6 @@ class AppConfig {
     'APP_MQTT_PASSWORD',
   );
 
-  // NETPIE REST API
-  static const String netpieControlUrl = String.fromEnvironment(
-    'APP_NETPIE_CONTROL_URL',
-    defaultValue:
-        'https://api.netpie.io/v2/device/message?topic=home/device_control',
-  );
-  static const String netpieStatusUrl = String.fromEnvironment(
-    'APP_NETPIE_STATUS_URL',
-    defaultValue: 'https://api.netpie.io/v2/device/shadow/data',
-  );
-  static const String netpieControlClientId = String.fromEnvironment(
-    'APP_NETPIE_CONTROL_CLIENT_ID',
-  );
-  static const String netpieControlToken = String.fromEnvironment(
-    'APP_NETPIE_CONTROL_TOKEN',
-  );
-  static const String netpieStatusClientId = String.fromEnvironment(
-    'APP_NETPIE_STATUS_CLIENT_ID',
-  );
-  static const String netpieStatusToken = String.fromEnvironment(
-    'APP_NETPIE_STATUS_TOKEN',
-  );
-
   // Firebase (Auth + Firestore ผ่าน REST API)
   static const String firebaseProjectId = String.fromEnvironment(
     'APP_FIREBASE_PROJECT_ID',
@@ -61,14 +39,8 @@ class AppConfig {
 
   static bool get hasMqtt => mqttClientId.isNotEmpty && mqttUser.isNotEmpty;
 
-  static bool get hasNetpieStatus =>
-      netpieStatusClientId.isNotEmpty && netpieStatusToken.isNotEmpty;
-
-  static bool get hasNetpieControl =>
-      netpieControlClientId.isNotEmpty && netpieControlToken.isNotEmpty;
-
-  // ไม่มีช่องทางคุยกับอุปกรณ์เลย → ใช้อุปกรณ์จำลองแทน
-  static bool get hasDevice => hasMqtt || hasNetpieStatus;
+  // ไม่ได้ตั้งค่า MQTT → ใช้อุปกรณ์จำลองแทน
+  static bool get hasDevice => hasMqtt;
 
   static bool get hasFirebase =>
       firebaseProjectId.isNotEmpty && firebaseApiKey.isNotEmpty;

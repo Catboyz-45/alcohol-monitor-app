@@ -1,0 +1,13 @@
+{
+  "name": "alcohol-monitor-firestore-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-alcohol-monitor --config ../firebase.json \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.0.0"
+  }
+}

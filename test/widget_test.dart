@@ -24,6 +24,13 @@ void main() {
     expect(find.text('ผลการเป่า'), findsOneWidget);
     expect(find.textContaining('โหมดสาธิต'), findsOneWidget);
     expect(find.text('อุปกรณ์ออนไลน์'), findsOneWidget);
+    expect(find.textContaining('ค่าสูงสุดของรอบนี้'), findsNothing);
+
+    // ปุ่มจำลองการเป่า: ไม่ต้องรอการเป่าอัตโนมัติ
+    await tester.tap(find.text('จำลองการเป่า'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('ค่าสูงสุดของรอบนี้'), findsOneWidget);
     await unmount(tester);
   });
 

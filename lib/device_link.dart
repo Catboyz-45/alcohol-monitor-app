@@ -4,10 +4,9 @@ import 'dart:math' as math;
 import 'app_state.dart';
 import 'config.dart';
 import 'device_reading.dart';
-import 'home_service.dart';
 import 'mqtt_service.dart';
 
-// ช่องทางส่งค่า threshold ไปยังอุปกรณ์ (จริงหรือจำลอง)
+// ช่องทางคุยกับอุปกรณ์ (จริงหรือจำลอง)
 abstract class DeviceLink {
   void start();
   void stop();
@@ -15,17 +14,15 @@ abstract class DeviceLink {
   Future<void> sendThresholds(double threshold1, double threshold2);
 }
 
-// ต่ออุปกรณ์จริงผ่าน NETPIE: MQTT เป็นช่องทางหลัก, REST shadow เป็น heartbeat/สำรอง
+// ต่ออุปกรณ์จริงผ่าน NETPIE MQTT อย่างเดียว
+// บอร์ดส่ง heartbeat ทุก 5 วินาที จึงไม่ต้องอ่าน shadow ผ่าน REST
+// (ซึ่งต้องใช้ token ของบอร์ดฝังไว้ในแอป)
 class NetpieDeviceLink implements DeviceLink {
-  NetpieDeviceLink(this.state, {HomeService? service})
-    : _service = service ?? HomeService();
+  NetpieDeviceLink(this.state);
 
   final AppState state;
-  final HomeService _service;
   MqttService? _mqtt;
-  Timer? _pollTimer;
   Timer? _ticker;
-  int? _lastShadowUptime;
 
   @override
   void start() {
@@ -35,14 +32,10 @@ class NetpieDeviceLink implements DeviceLink {
         username: AppConfig.mqttUser,
         password: AppConfig.mqttPassword,
         onConnectionChanged: state.setMqttConnected,
-        onReading: (reading) => state.applyReading(reading),
+        onReading: state.applyReading,
       )..connect();
-    }
-    if (AppConfig.hasNetpieStatus) {
-      refresh();
-      _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => refresh());
-    } else if (!AppConfig.hasMqtt) {
-      state.setRestOk(false);
+    } else {
+      state.setMqttConnected(false);
     }
     // อัปเดตป้าย "กี่วินาทีที่แล้ว" และตรวจว่าอุปกรณ์เงียบไปหรือยัง
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => state.tick());
@@ -50,62 +43,48 @@ class NetpieDeviceLink implements DeviceLink {
 
   @override
   void stop() {
-    _pollTimer?.cancel();
     _ticker?.cancel();
     _mqtt?.disconnect();
   }
 
-  // อ่าน shadow: ถ้าค่า uptime ไม่เปลี่ยนแปลงแปลว่าบอร์ดไม่ได้อัปเดต (ค่าค้าง)
+  // ขอสถานะล่าสุดจากบอร์ดทันที
   @override
-  Future<void> refresh() async {
-    if (!AppConfig.hasNetpieStatus) {
-      return;
-    }
-    try {
-      final reading = await _service.getDeviceStatus();
-      final uptime = reading.uptimeMs;
-      final fresh =
-          uptime == null
-              // firmware รุ่นเก่าไม่มี uptime จึงตรวจความสดไม่ได้
-              ? true
-              : _lastShadowUptime != null && uptime != _lastShadowUptime;
-      _lastShadowUptime = uptime;
-      state.setRestOk(true);
-      state.applyReading(reading, fresh: fresh);
-    } catch (_) {
-      state.setRestOk(false);
-    }
-  }
+  Future<void> refresh() async => _mqtt?.ping();
 
   @override
   Future<void> sendThresholds(double threshold1, double threshold2) async {
-    final payload = HomeService.thresholdPayload(threshold1, threshold2);
-    await _service.updateThresholds(
-      threshold1: payload['threshold1']!,
-      threshold2: payload['threshold2']!,
-    );
+    final mqtt = _mqtt;
+    if (mqtt == null) {
+      throw StateError('ยังไม่ได้ตั้งค่า MQTT');
+    }
+    final payload = thresholdPayload(threshold1, threshold2);
+    mqtt.sendThresholds(payload['threshold1']!, payload['threshold2']!);
     state.markThresholdsSent(payload['threshold1']!, payload['threshold2']!);
   }
 }
 
-// อุปกรณ์จำลองสำหรับโหมดสาธิต: ค่าพื้นหลังต่ำ และจำลองการเป่าเป็นระยะ
+// อุปกรณ์จำลองสำหรับโหมดสาธิต: ค่าพื้นหลังต่ำ เป่าเองเป็นระยะ หรือกดจำลองการเป่าได้
 class SimulatedDeviceLink implements DeviceLink {
   SimulatedDeviceLink(this.state, {math.Random? random})
     : _random = random ?? math.Random();
+
+  // ระยะห่างของการเป่าอัตโนมัติ (วินาที)
+  static const int autoBlowEvery = 20;
+  // ความยาวของการเป่าหนึ่งครั้ง (วินาที)
+  static const int blowLength = 4;
 
   final AppState state;
   final math.Random _random;
   Timer? _timer;
   double _t1 = kDefaultThreshold1;
   double _t2 = kDefaultThreshold2;
-  int _tick = 0;
+  int _idleTicks = 0;
+  int _blowStep = 0;
   double _blowPeak = 0;
-  int _uptimeMs = 0;
 
   @override
   void start() {
     state.setMqttConnected(true);
-    state.setRestOk(true);
     _emit();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _emit());
   }
@@ -114,34 +93,44 @@ class SimulatedDeviceLink implements DeviceLink {
   void stop() => _timer?.cancel();
 
   @override
-  Future<void> refresh() async => _emit();
+  Future<void> refresh() async => _emit(advance: false);
 
-  // จำลองให้บอร์ดรับค่าแล้วส่งค่าใหม่กลับมาในรอบถัดไป
+  // เริ่มการเป่าจำลองทันที (ปุ่มในหน้าตรวจวัด)
+  void triggerBlow() {
+    _startBlow();
+    _emit(advance: false);
+  }
+
+  // จำลองให้บอร์ดรับค่าแล้วส่งค่าใหม่กลับมา
   @override
   Future<void> sendThresholds(double threshold1, double threshold2) async {
-    final payload = HomeService.thresholdPayload(threshold1, threshold2);
+    final payload = thresholdPayload(threshold1, threshold2);
     state.markThresholdsSent(payload['threshold1']!, payload['threshold2']!);
     await Future<void>.delayed(const Duration(milliseconds: 600));
     _t1 = payload['threshold1']!;
     _t2 = payload['threshold2']!;
-    _emit();
+    _emit(advance: false);
   }
 
-  void _emit() {
-    _tick++;
-    _uptimeMs += 1000;
-    // ทุก ~12 วินาทีจำลองการเป่า 1 ครั้ง ยาว 4 วินาที
-    final phase = _tick % 12;
-    if (phase == 1) {
-      _blowPeak = 12 + _random.nextDouble() * 60;
+  void _startBlow() {
+    _blowStep = 1;
+    _idleTicks = 0;
+    _blowPeak = 12 + _random.nextDouble() * 60;
+  }
+
+  void _emit({bool advance = true}) {
+    if (advance) {
+      if (_blowStep > 0) {
+        _blowStep = _blowStep >= blowLength ? 0 : _blowStep + 1;
+      } else if (++_idleTicks >= autoBlowEvery) {
+        _startBlow();
+      }
     }
-    final double bac;
-    if (phase >= 1 && phase <= 4) {
-      final shape = math.sin(phase / 5 * math.pi);
-      bac = _blowPeak * shape;
-    } else {
-      bac = 2 + _random.nextDouble() * 4;
-    }
+
+    final bac =
+        _blowStep > 0
+            ? _blowPeak * math.sin(_blowStep / (blowLength + 1) * math.pi)
+            : 2 + _random.nextDouble() * 4;
     final rounded = (bac * 10).round() / 10;
     state.applyReading(
       DeviceReading(
@@ -150,7 +139,6 @@ class SimulatedDeviceLink implements DeviceLink {
         threshold1: _t1,
         threshold2: _t2,
         alertLevel: alertLevelFor(rounded, _t1, _t2),
-        uptimeMs: _uptimeMs,
       ),
     );
   }

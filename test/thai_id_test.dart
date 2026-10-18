@@ -23,6 +23,13 @@ void main() {
     expect(maskThaiId(''), '-');
   });
 
+  test('เลขที่เก็บแบบปิดไว้ในเครื่อง', () {
+    expect(redactIdForStorage(validId), 'XXXXXXXXXX450');
+    expect(maskThaiId('XXXXXXXXXX450'), 'X-XXXX-XXXXX-45-0');
+    expect(hasFullThaiId(validId), isTrue);
+    expect(hasFullThaiId('XXXXXXXXXX450'), isFalse);
+  });
+
   test('จัดรูปแบบเลขบัตรเต็ม', () {
     expect(formatThaiId(validId), '1-1017-00203-45-0');
     expect(formatThaiId('123'), '123');

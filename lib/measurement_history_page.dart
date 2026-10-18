@@ -380,15 +380,22 @@ class _RecordDetailsState extends State<_RecordDetails> {
             row(
               'เลขบัตรประชาชน',
               _showId ? formatThaiId(record.idCard) : maskThaiId(record.idCard),
-              trailing: IconButton(
-                tooltip: _showId ? 'ซ่อนเลขบัตร' : 'แสดงเลขบัตร',
-                icon: Icon(
-                  _showId
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                ),
-                onPressed: () => setState(() => _showId = !_showId),
-              ),
+              // เลขเต็มของรายการที่ซิงก์แล้วไม่ได้เก็บในเครื่อง ต้องโหลดจาก cloud ก่อน
+              trailing:
+                  !hasFullThaiId(record.idCard)
+                      ? const Tooltip(
+                        message: 'เชื่อมต่อ cloud เพื่อดูเลขเต็ม',
+                        child: Icon(Icons.cloud_off_outlined, size: 20),
+                      )
+                      : IconButton(
+                        tooltip: _showId ? 'ซ่อนเลขบัตร' : 'แสดงเลขบัตร',
+                        icon: Icon(
+                          _showId
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(() => _showId = !_showId),
+                      ),
             ),
             row('อายุ', '${record.age} ปี'),
             row('ทะเบียนรถ', '${record.licensePlate} ${record.province}'),

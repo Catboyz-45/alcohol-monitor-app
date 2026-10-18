@@ -13,13 +13,26 @@ bool isValidThaiId(String input) {
   return check == int.parse(digits[12]);
 }
 
-// ปิดเลขบัตรให้เหลือ 3 หลักท้าย เช่น X-XXXX-XXXXX-12-3
-String maskThaiId(String input) {
+// เลขบัตรที่เก็บในเครื่องแบบปิดไว้ (เหลือ 3 หลักท้าย) เช่น XXXXXXXXXX123
+String redactIdForStorage(String input) {
   final digits = input.replaceAll(RegExp(r'\D'), '');
   if (digits.length != 13) {
-    return digits.isEmpty ? '-' : 'X' * digits.length;
+    return input;
   }
-  return 'X-XXXX-XXXXX-${digits.substring(10, 12)}-${digits[12]}';
+  return 'XXXXXXXXXX${digits.substring(10)}';
+}
+
+// true ถ้ามีเลขบัตรเต็ม (ไม่ใช่แบบที่ปิดไว้ตอนเก็บในเครื่อง)
+bool hasFullThaiId(String input) =>
+    RegExp(r'^\d{13}$').hasMatch(input.replaceAll(RegExp(r'[\s-]'), ''));
+
+// ปิดเลขบัตรให้เหลือ 3 หลักท้าย เช่น X-XXXX-XXXXX-12-3
+String maskThaiId(String input) {
+  final chars = input.replaceAll(RegExp(r'[^0-9X]'), '');
+  if (chars.length != 13) {
+    return chars.isEmpty ? '-' : 'X' * chars.length;
+  }
+  return 'X-XXXX-XXXXX-${chars.substring(10, 12)}-${chars[12]}';
 }
 
 // จัดรูปแบบเลขบัตรเต็มให้อ่านง่าย เช่น 1-2345-67890-12-3

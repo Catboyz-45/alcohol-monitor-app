@@ -6,10 +6,6 @@
   "APP_MQTT_CLIENT_ID": "app-device-client-id",
   "APP_MQTT_USER": "app-device-token",
   "APP_MQTT_PASSWORD": "app-device-secret",
-  "APP_NETPIE_CONTROL_CLIENT_ID": "app-device-client-id",
-  "APP_NETPIE_CONTROL_TOKEN": "app-device-token",
-  "APP_NETPIE_STATUS_CLIENT_ID": "board-device-client-id",
-  "APP_NETPIE_STATUS_TOKEN": "board-device-token",
   "APP_FIREBASE_PROJECT_ID": "your-firebase-project-id",
   "APP_FIREBASE_API_KEY": "your-firebase-web-api-key"
 }

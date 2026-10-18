@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'device_reading.dart';
 import 'firestore_repository.dart';
 import 'measurement_record.dart';
+import 'thai_id.dart';
 
 export 'measurement_record.dart';
 
@@ -16,7 +17,7 @@ enum LinkState {
   online,
   // เคยได้ข้อมูล แต่อุปกรณ์เงียบไปนานเกินไป (ค่าที่เห็นอาจไม่ใช่ปัจจุบัน)
   stale,
-  // ต่อ MQTT และ REST ไม่ได้ทั้งคู่
+  // ต่อ MQTT ไม่ได้
   offline,
 }
 
@@ -28,9 +29,9 @@ class AppState extends ChangeNotifier {
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
-  // อุปกรณ์ถือว่าออฟไลน์ถ้าไม่มีข้อมูลใหม่เกินเวลานี้
-  // (firmware อัปเดต shadow ทุก 1 วินาที และส่ง heartbeat ทุก 5 วินาที)
-  static const Duration staleAfter = Duration(seconds: 10);
+  // อุปกรณ์ถือว่าเงียบไปถ้าไม่มีข้อมูลใหม่เกินเวลานี้
+  // (firmware ส่ง heartbeat ทุก 5 วินาที เผื่อหลุดได้ 1 รอบ)
+  static const Duration staleAfter = Duration(seconds: 12);
 
   // ค่าต่ำกว่านี้ถือเป็นค่าพื้นหลังของเซนเซอร์ ไม่นับเป็นการเป่า
   // ตรงกับ MIN_REPORT_BAC ใน firmware
@@ -211,11 +212,25 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // รายการที่ขึ้น cloud แล้วไม่จำเป็นต้องเก็บเลขบัตรเต็มในเครื่อง
+  // (SharedPreferences ไม่เข้ารหัส) ส่วนรายการที่ยังรอส่งต้องเก็บเต็มไว้ส่งขึ้น cloud
   Future<void> _saveLocal() async {
     final prefs = await SharedPreferences.getInstance();
+    final cloud = remote != null;
     await prefs.setString(
       storageKey,
-      jsonEncode(_records.map((e) => e.toJson()).toList()),
+      jsonEncode(
+        _records
+            .map(
+              (e) =>
+                  cloud && e.synced
+                      ? e
+                          .copyWith(idCard: redactIdForStorage(e.idCard))
+                          .toJson()
+                      : e.toJson(),
+            )
+            .toList(),
+      ),
     );
     await prefs.setStringList(_pendingDeletesKey, _pendingDeletes.toList());
   }
@@ -226,9 +241,8 @@ class AppState extends ChangeNotifier {
 
   DeviceReading? latest;
   DateTime? lastUpdate;
-  DateTime? _lastFreshAt;
-  bool mqttConnected = false;
-  bool? restOk;
+  // null = กำลังเชื่อมต่อครั้งแรก
+  bool? mqttConnected;
 
   // ค่าสูงสุดของการเป่าครั้งนี้ (บอร์ดแสดงค่าค้างแค่ 2.5 วินาที
   // จึงต้องจำค่าสูงสุดไว้ให้เจ้าหน้าที่บันทึกได้ทัน)
@@ -244,30 +258,27 @@ class AppState extends ChangeNotifier {
   double get threshold2 => latest?.threshold2 ?? kDefaultThreshold2;
 
   LinkState get link {
-    final freshAt = _lastFreshAt;
-    if (freshAt != null) {
-      return _clock().difference(freshAt) <= staleAfter
-          ? LinkState.online
-          : LinkState.stale;
-    }
-    if (!mqttConnected && restOk == false) {
+    if (mqttConnected == false) {
       return LinkState.offline;
     }
-    return LinkState.connecting;
+    final freshAt = lastUpdate;
+    if (freshAt == null) {
+      return LinkState.connecting;
+    }
+    return _clock().difference(freshAt) <= staleAfter
+        ? LinkState.online
+        : LinkState.stale;
   }
 
-  // รับค่าจากอุปกรณ์ fresh=false เมื่อรู้ว่าเป็นค่าเก่าค้างใน shadow
-  void applyReading(DeviceReading reading, {bool fresh = true}) {
+  // รับค่าจากอุปกรณ์ (ทุกข้อความจาก MQTT คือค่าสด)
+  void applyReading(DeviceReading reading) {
     final now = _clock();
     latest = reading;
     lastUpdate = now;
-    if (fresh) {
-      _lastFreshAt = now;
-      if (reading.bac > noiseFloor &&
-          (peakBac == null || reading.bac > peakBac!)) {
-        peakBac = reading.bac;
-        peakAt = now;
-      }
+    if (reading.bac > noiseFloor &&
+        (peakBac == null || reading.bac > peakBac!)) {
+      peakBac = reading.bac;
+      peakAt = now;
     }
 
     final pending = pendingThresholds;
@@ -285,14 +296,6 @@ class AppState extends ChangeNotifier {
       return;
     }
     mqttConnected = value;
-    notifyListeners();
-  }
-
-  void setRestOk(bool value) {
-    if (restOk == value) {
-      return;
-    }
-    restOk = value;
     notifyListeners();
   }
 

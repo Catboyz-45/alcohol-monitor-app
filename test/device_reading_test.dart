@@ -1,5 +1,4 @@
 import 'package:alcohol_monitor_app/device_reading.dart';
-import 'package:alcohol_monitor_app/home_service.dart';
 import 'package:alcohol_monitor_app/mqtt_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,7 +17,6 @@ void main() {
       expect(reading.threshold2, 50);
       expect(reading.alertLevel, 1);
       expect(reading.status, AlertStatus.warning);
-      expect(reading.uptimeMs, 120000);
     });
 
     test('shadow แบบมี data ซ้อน และไม่มี alertLevel จะคำนวณระดับเอง', () {
@@ -39,16 +37,15 @@ void main() {
       expect(reading.alertLevel, 2);
       expect(reading.status, AlertStatus.danger);
       expect(reading.raw, isNull);
-      expect(reading.uptimeMs, isNull);
     });
 
-    test('อ่าน uptime จาก shadow รุ่นใหม่', () {
+    test('heartbeat ที่ไม่มีการเป่าก็อ่านได้', () {
       final reading =
-          DeviceReading.tryParse({
-            'data': {'bac': 3, 'uptime': 5000, 'alertLevel': 0, 'raw': 120},
-          })!;
-      expect(reading.uptimeMs, 5000);
-      expect(reading.raw, 120);
+          MqttService.parsePayload(
+            '{"bac":3.1,"raw":127,"threshold1":20,"threshold2":50,"alertLevel":0}',
+          )!;
+      expect(reading.status, AlertStatus.safe);
+      expect(reading.raw, 127);
     });
 
     test('ไม่มี bac แต่มี raw จะแปลงด้วยสูตรเดียวกับ firmware', () {
@@ -108,24 +105,19 @@ void main() {
     });
   });
 
-  group('HomeService', () {
-    test('thresholdPayload เรียงค่าและคุมช่วงก่อนส่งให้บอร์ด', () {
-      expect(HomeService.thresholdPayload(70, 30), {
-        'threshold1': 30.0,
-        'threshold2': 70.0,
-      });
-      expect(HomeService.thresholdPayload(-5, 120), {
-        'threshold1': 0.0,
-        'threshold2': 100.0,
-      });
-    });
+  test('thresholdPayload เรียงค่าและคุมช่วงก่อนส่งให้บอร์ด', () {
+    expect(thresholdPayload(70, 30), {'threshold1': 30.0, 'threshold2': 70.0});
+    expect(thresholdPayload(-5, 120), {'threshold1': 0.0, 'threshold2': 100.0});
+  });
 
-    test('ไม่ได้ตั้งค่า NETPIE จะไม่ยิง request', () {
-      expect(HomeService().getDeviceStatus(), throwsStateError);
-      expect(
-        HomeService().updateThresholds(threshold1: 1, threshold2: 2),
-        throwsStateError,
-      );
-    });
+  test('ส่ง threshold ตอนยังไม่ได้ต่อ MQTT จะ error แทนการเงียบหาย', () {
+    final service = MqttService(
+      clientId: 'c',
+      username: 'u',
+      password: 'p',
+      onReading: (_) {},
+      onConnectionChanged: (_) {},
+    );
+    expect(() => service.sendThresholds(20, 50), throwsStateError);
   });
 }

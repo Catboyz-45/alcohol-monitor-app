@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'app_state.dart';
+import 'device_link.dart';
 import 'device_reading.dart';
 import 'provinces.dart';
 import 'thai_id.dart';
@@ -303,6 +304,20 @@ class _ReadingCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (appState.isDemo) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final device = context.read<DeviceLink>();
+                  if (device is SimulatedDeviceLink) {
+                    device.triggerBlow();
+                  }
+                },
+                icon: const Icon(Icons.air),
+                label: const Text('จำลองการเป่า'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+              ),
+            ],
             if (link != LinkState.online) ...[
               const SizedBox(height: 16),
               _LinkWarning(link: link, lastUpdate: appState.lastUpdate),
@@ -363,7 +378,7 @@ class _LinkWarning extends StatelessWidget {
       LinkState.stale =>
         'อุปกรณ์ไม่ได้ส่งข้อมูลใหม่ (ล่าสุด ${timeAgo(lastUpdate)}) ค่าที่เห็นอาจไม่ใช่ค่าปัจจุบัน',
       LinkState.offline =>
-        'เชื่อมต่อ NETPIE ไม่ได้ ตรวจอินเทอร์เน็ตหรือค่าคอนฟิกในแท็บอุปกรณ์',
+        'ยังไม่ได้เชื่อมต่อ NETPIE ตรวจอินเทอร์เน็ตหรือค่าคอนฟิกในแท็บอุปกรณ์',
       _ => 'กำลังรอข้อมูลจากอุปกรณ์…',
     };
     return Container(

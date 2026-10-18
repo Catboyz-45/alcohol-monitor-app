@@ -29,11 +29,11 @@ class MeasurementRecord {
 
   AlertStatus get alertStatus => AlertStatusCode.fromCode(status);
 
-  MeasurementRecord copyWith({bool? synced}) {
+  MeasurementRecord copyWith({bool? synced, String? idCard}) {
     return MeasurementRecord(
       id: id,
       name: name,
-      idCard: idCard,
+      idCard: idCard ?? this.idCard,
       age: age,
       licensePlate: licensePlate,
       province: province,
