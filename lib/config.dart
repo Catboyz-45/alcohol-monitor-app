@@ -11,7 +11,7 @@ class AppConfig {
   );
   static const int mqttPort = int.fromEnvironment(
     'APP_MQTT_PORT',
-    defaultValue: 1884,
+    defaultValue: 8883,
   );
   static const bool mqttTls = bool.fromEnvironment(
     'APP_MQTT_TLS',

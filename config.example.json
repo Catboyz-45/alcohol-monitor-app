@@ -1,6 +1,6 @@
 {
   "APP_MQTT_HOST": "mqtt.netpie.io",
-  "APP_MQTT_PORT": "1884",
+  "APP_MQTT_PORT": "8883",
   "APP_MQTT_TLS": "true",
   "APP_MQTT_WS_URL": "wss://mqtt.netpie.io:443/mqtt",
   "APP_MQTT_CLIENT_ID": "app-device-client-id",

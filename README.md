@@ -80,7 +80,7 @@ flutter run --dart-define-from-file=config.json
 | ค่า | ใช้ทำอะไร |
 | --- | --- |
 | `APP_MQTT_CLIENT_ID` / `APP_MQTT_USER` / `APP_MQTT_PASSWORD` | Client ID / Token / Secret ของ **device ฝั่งแอป** ใน NETPIE (สร้างแยกจากบอร์ด แต่อยู่ group เดียวกัน) |
-| `APP_MQTT_PORT` / `APP_MQTT_TLS` | ค่าเริ่มต้นคือ `1884` และ TLS เปิดอยู่ (ใช้กับแอป native ส่วนเว็บใช้ `APP_MQTT_WS_URL`) ถ้าต่อไม่ได้ให้ลอง `1883` และ `false` |
+| `APP_MQTT_PORT` / `APP_MQTT_TLS` | ค่าเริ่มต้นคือ `8883` และ TLS เปิดอยู่ (ใช้กับแอป native ส่วนเว็บใช้ `APP_MQTT_WS_URL`) อย่าใช้ `1884` เพราะใบรับรองออกโดย CA ส่วนตัวของ NEXPIE แอปจึงตรวจไม่ผ่าน |
 | `APP_FIREBASE_PROJECT_ID` / `APP_FIREBASE_API_KEY` | เปิดการล็อกอินและซิงก์กับ Firestore (ไม่ใส่ = เก็บประวัติในเครื่องอย่างเดียว) |
 
 ### ตั้งค่า Firebase
