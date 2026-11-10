@@ -2,9 +2,9 @@
 
 แอป Flutter สำหรับเจ้าหน้าที่ใช้บันทึกผลตรวจแอลกอฮอล์จากเครื่องวัด IoT (ESP32 + เซนเซอร์ MQ-3) รับค่าแบบเรียลไทม์ผ่าน NETPIE จำค่าสูงสุดของการเป่าแต่ละครั้ง และเก็บประวัติลง Cloud Firestore โดยต้องเข้าสู่ระบบก่อน ถ้าเน็ตหลุด แอปเก็บข้อมูลไว้ในเครื่องแล้วส่งขึ้น cloud ให้ภายหลัง
 
-ผลงานรายวิชา 02739342 Application Development for Mobile Devices · โค้ดฝั่งบอร์ดอยู่ที่ [alcohol-monitor-firmware](https://github.com/Catboyz-45/alcohol-monitor-firmware)
+ผลงานรายวิชา 02739496 สาขาวิชาเทคโนโลยีสารสนเทศ มหาวิทยาลัยเกษตรศาสตร์ วิทยาเขตกำแพงแสน · โค้ดฝั่งบอร์ดอยู่ที่ [alcohol-monitor-firmware](https://github.com/Catboyz-45/alcohol-monitor-firmware)
 
-**รายงานโครงงาน:** [docs/report.pdf](docs/report.pdf) (เขียนตามเวอร์ชันก่อนปรับหน้าตาแอปและก่อนเปลี่ยน MQTT เป็น TLS ภาพหน้าจอในรายงานจึงเป็นแบบเดิม)
+**รายงานโครงงาน:** [docs/report.pdf](docs/report.pdf)
 
 **ลองใช้ได้ทันที:** [เว็บเดโม](https://catboyz-45.github.io/alcohol-monitor-app/)
 
