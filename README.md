@@ -4,6 +4,8 @@
 
 ผลงานรายวิชา 02739342 Application Development for Mobile Devices · โค้ดฝั่งบอร์ดอยู่ที่ [alcohol-monitor-firmware](https://github.com/Catboyz-45/alcohol-monitor-firmware)
 
+**รายงานโครงงาน:** [docs/report.pdf](docs/report.pdf) (เขียนตามเวอร์ชันก่อนปรับหน้าตาแอปและก่อนเปลี่ยน MQTT เป็น TLS ภาพหน้าจอในรายงานจึงเป็นแบบเดิม)
+
 **ลองใช้ได้ทันที:** [เว็บเดโม](https://catboyz-45.github.io/alcohol-monitor-app/)
 
 | วิธีเข้า | ใช้ทำอะไร |
@@ -13,9 +15,11 @@
 
 ทั้งสองแบบใช้อุปกรณ์จำลอง (กด "จำลองการเป่า" ได้) ข้อมูลทั้งหมดในระบบเดโมเป็นข้อมูลสมมติ และบัญชีทดลองใช้ร่วมกันทุกคน **อย่ากรอกชื่อหรือเลขบัตรของคนจริง**
 
-| เข้าสู่ระบบ | ตรวจวัด | ประวัติ | รายละเอียด | อุปกรณ์ |
-| --- | --- | --- | --- | --- |
-| ![เข้าสู่ระบบ](docs/screenshots/login.png) | ![ตรวจวัด](docs/screenshots/measure.png) | ![ประวัติ](docs/screenshots/history.png) | ![รายละเอียด](docs/screenshots/record-detail.png) | ![อุปกรณ์](docs/screenshots/device.png) |
+| เข้าสู่ระบบ | หน้าหลัก | ขั้นที่ 1: ข้อมูล | ขั้นที่ 2: เป่า |
+| --- | --- | --- | --- |
+| ![เข้าสู่ระบบ](docs/screenshots/login.png) | ![หน้าหลัก](docs/screenshots/home.png) | ![กรอกข้อมูลผู้ถูกตรวจ](docs/screenshots/measure-info.png) | ![เป่า](docs/screenshots/measure-blow.png) |
+| **ขั้นที่ 3: ผลตรวจ** | **ประวัติ** | **รายละเอียด** | **เครื่องวัด** |
+| ![ผลตรวจ](docs/screenshots/measure-result.png) | ![ประวัติ](docs/screenshots/history.png) | ![รายละเอียด](docs/screenshots/record-detail.png) | ![เครื่องวัด](docs/screenshots/device.png) |
 
 ## ความสามารถหลัก
 
