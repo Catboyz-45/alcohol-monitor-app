@@ -38,7 +38,8 @@ dependencies:
   mqtt_client: ^10.8.0
   provider: ^6.1.5
   shared_preferences: ^2.5.3
-
+  share_plus: ^13.3.1
+  web: ^1.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -47,6 +48,18 @@ dev_dependencies:
 flutter:
   # The following line ensures that the Material Icons font is
   uses-material-design: true
+
+  # IBM Plex Sans Thai (SIL OFL 1.1, assets/fonts/OFL.txt) ฝังในแอปให้ใช้ได้แม้ออฟไลน์
+  fonts:
+    - family: IBMPlexSansThai
+      fonts:
+        - asset: assets/fonts/IBMPlexSansThai-Regular.ttf
+        - asset: assets/fonts/IBMPlexSansThai-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansThai-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansThai-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   assets: []
